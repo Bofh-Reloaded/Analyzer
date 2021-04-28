@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AnalyzerCore.Notifier;
 using System.Threading;
+using AnalyzerCore.Models.BscScanModels;
 
 namespace AnalyzerCore
 {
@@ -64,6 +65,19 @@ namespace AnalyzerCore
         }
         */
 
+        public static async Task<List<Result>> GetTransactionsByAddressAsync(string address, string startBlock, string endBlock)
+        {
+            var trx = await bscScanApiClient.RetrieveTransactionsAsync(
+                        address: address,
+                        startBlock: startBlock,
+                        endBlock: endBlock);
+            var options = new JsonSerializerOptions()
+            {
+                WriteIndented = true
+            };
+            return trx.result;
+        }
+
         static async Task Main(string[] args)
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
@@ -72,12 +86,10 @@ namespace AnalyzerCore
             List<string> Addresses = new List<string> {
                 OurAddress,
                 enemyAddress,
-                "0x6dd596eec44067d80ca2122e757ab806f551e521",
-                "0x380cD66bCA70e8cd5eb8F4e17b59594837F1C339",
-                "0xfb438dc206e3e29f83748ad1a785b83f43cde553"
+                "0x6dd596eec44067d80ca2122e757ab806f551e521"
             };
 
-            log.Info("Starting Bot.");
+            log.Info("Bot Started");
 
             while (true)
             {
@@ -88,25 +100,16 @@ namespace AnalyzerCore
                 //Retrieve Transactions for the last n blocks
                 int startBlock = int.Parse(currentBlock) - numbersOfBlocksToAnalyze.Max();
 
-                foreach (var address in Addresses)
-                {
-                    log.Info($"Retrieving Transaction for Address: {address} from block: {startBlock.ToString()} to block: {currentBlock}");
-                    var trx = await bscScanApiClient.RetrieveTransactionsAsync(
-                        address: address,
-                        startBlock: startBlock.ToString(),
-                        endBlock: currentBlock);
-                    var options = new JsonSerializerOptions()
-                    {
-                        WriteIndented = true
-                    };
-                    log.Info($"Total: {trx.result.Count} trx retrieved.");
+                foreach (var address in Addresses) {
+                    var trx = await GetTransactionsByAddressAsync(address, startBlock.ToString(), endBlock: currentBlock);
+                    log.Info($"Total: {trx.Count} trx retrieved.");
                     tgMsgs.Add($"*[{address}]*");
 
                     // Start Analyze
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
                         int firstBlock = int.Parse(currentBlock) - numberOfBlocks;
-                        var transactions = trx.result.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
+                        var transactions = trx.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
                         tgMsgs.Add($" Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.");
                         var successTransactions = transactions.Where(tr => tr.txreceipt_status == "1");
                         try
