@@ -5,28 +5,29 @@ using System.Threading.Tasks;
 
 namespace AnalyzerCore.Notifier
 {
-    public class Notifier
+    public class TelegramNotifier
     {
         private TelegramBotClient _Bot = new TelegramBotClient(
             token: "1780013642:AAH2nN3rFtRFLQzh4dHd1gjNTdwGWFHrYL8"
             );
-        private readonly ChatId _chatId = new ChatId(identifier: -580341821);
+        private readonly ChatId _chatId = new ChatId(identifier: -560874043);
 
-        public Notifier()
+        public TelegramNotifier()
         {
         }
 
-        public Notifier(string chatId)
+        public TelegramNotifier(string chatId)
         {
             this._chatId = chatId;
         }
 
         public async void SendMessage(string text)
-        {
-            await _Bot.SendTextMessageAsync(
-                chatId: this._chatId,
-                text: text
-                );
+        { 
+            Message result = await _Bot.SendTextMessageAsync(
+                            chatId: this._chatId,
+                            text: text,
+                            parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown
+                            );
         }
     }
 }
