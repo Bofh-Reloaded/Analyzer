@@ -12,6 +12,10 @@ using System.Linq;
 using AnalyzerCore.Notifier;
 using System.Threading;
 using AnalyzerCore.Models.BscScanModels;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
+
+
 
 namespace AnalyzerCore
 {
@@ -20,12 +24,12 @@ namespace AnalyzerCore
         private static readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
-        static readonly string enemyAddress = "0x135950adfda533dc212535093c4c4e5a62fc9195";
         static readonly string OurAddress = "0x153e170524cfad4261743ce8bd8053e15d6d1f15";
         private static BscScan bscScanApiClient = new BscScan();
         private static List<int> numbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
         //implementare comando via bot per richiamare analisi all'interno di un block range
         private static TelegramNotifier telegramNotifier = new TelegramNotifier();
+
 
         /*
         static TransactionReceipt()
@@ -78,22 +82,37 @@ namespace AnalyzerCore
             return trx.result;
         }
 
-        static async Task Main(string[] args)
+        static void main(string[] args)
         {
+            try
+            {
+                MainAsync().Wait();
+            } catch (Exception ex)
+            {
+                log.Error(ex);
+            }
+        }
+
+        static async Task MainAsync()
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
+                .Build();
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
             ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
-            List<string> Addresses = new List<string> {
-                OurAddress,
-                enemyAddress,
-                "0x6dd596eec44067d80ca2122e757ab806f551e521"
-            };
+            var Addresses = new List<string>();
+            configuration.GetSection("enemies").Bind(Addresses);
+            Addresses.Insert(0, OurAddress);
+            List<string> trxHashAlerted = new List<string>();
 
             log.Info("Bot Started");
 
             while (true)
             {
                 List<string> tgMsgs = new List<string>();
+                tgMsgs.Add($"*[{DateTime.Now}]*");
                 //Getting Current Block
                 string currentBlock = await bscScanApiClient.GetCurrentBlock();
 
