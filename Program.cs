@@ -82,18 +82,14 @@ namespace AnalyzerCore
             return trx.result;
         }
 
-        static void main(string[] args)
-        {
-            try
-            {
-                MainAsync().Wait();
-            } catch (Exception ex)
-            {
-                log.Error(ex);
-            }
+        private static List<Result> GetFailedTrxWithHiGas(List<Result> transactions, long gasTrigger = 40000) {
+            var toNotify = transactions
+                .Where(tr => int.Parse(tr.txreceipt_status) == 0)
+                .Where(tr => long.Parse(tr.gasUsed) >= gasTrigger).ToList();
+            return toNotify;
         }
 
-        static async Task MainAsync()
+        private static async Task MainAsync()
         {
             IConfiguration configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
@@ -102,9 +98,16 @@ namespace AnalyzerCore
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
             ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
-            var Addresses = new List<string>();
-            configuration.GetSection("enemies").Bind(Addresses);
-            Addresses.Insert(0, OurAddress);
+            var Addresses = new List<string>()
+            {
+                OurAddress,
+                "0x135950adfda533dc212535093c4c4e5a62fc9195",
+                "0x6dd596eec44067d80ca2122e757ab806f551e521",
+                "0x23267395057554d62e144323d0fa7dc0c0550d69",
+                "0x1ad83ec9cc98aca1898fd1c9e4475717851301f9"
+            };
+            /*configuration.GetSection("enemies").Bind(Addresses);
+            Addresses.Insert(0, OurAddress);*/
             List<string> trxHashAlerted = new List<string>();
 
             log.Info("Bot Started");
@@ -142,11 +145,36 @@ namespace AnalyzerCore
                             tgMsgs.Add("No Transaction in this interval");
                         }
                     }
+
+                    // Analyze Failed trx
+                    if (address == OurAddress) {
+                        var t = GetFailedTrxWithHiGas(transactions: trx);
+                        var trxToNotify = t.Where(t => !trxHashAlerted.Contains(t.hash)).ToList();
+                        foreach(var tn in trxToNotify)
+                        {
+                            telegramNotifier.SendMessage($"Tx failed: {tn.hash} with gasUsed: {tn.gasUsed}");
+                            trxHashAlerted.Add(tn.hash);
+                        }
+
+                    }
+                    
                 }
 
                 string finalMsg = string.Join(Environment.NewLine, tgMsgs.ToArray());
                 telegramNotifier.SendMessage(finalMsg);
                 Thread.Sleep(120000);
+            }
+        }
+
+        static void Main(string[] args)
+        {
+            try
+            {
+                MainAsync().Wait();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex);
             }
         }
     }
