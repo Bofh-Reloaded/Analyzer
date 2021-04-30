@@ -13,9 +13,9 @@ using AnalyzerCore.Notifier;
 using System.Threading;
 using AnalyzerCore.Models.BscScanModels;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
-
-
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.Collections;
 
 namespace AnalyzerCore
 {
@@ -29,6 +29,7 @@ namespace AnalyzerCore
         private static List<int> numbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
         //implementare comando via bot per richiamare analisi all'interno di un block range
         private static TelegramNotifier telegramNotifier = new TelegramNotifier();
+        public static IConfigurationRoot configuration;
 
 
         /*
@@ -91,13 +92,8 @@ namespace AnalyzerCore
 
         private static async Task MainAsync()
         {
-            IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();
-            var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-            XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
+            log.Info("Creating Service Collection");
+
             var Addresses = new List<string>()
             {
                 OurAddress,
@@ -106,8 +102,6 @@ namespace AnalyzerCore
                 "0x23267395057554d62e144323d0fa7dc0c0550d69",
                 "0x1ad83ec9cc98aca1898fd1c9e4475717851301f9"
             };
-            /*configuration.GetSection("enemies").Bind(Addresses);
-            Addresses.Insert(0, OurAddress);*/
             List<string> trxHashAlerted = new List<string>();
 
             log.Info("Bot Started");
@@ -132,7 +126,7 @@ namespace AnalyzerCore
                     {
                         int firstBlock = int.Parse(currentBlock) - numberOfBlocks;
                         var transactions = trx.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
-                        tgMsgs.Add($" Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.");
+                        tgMsgs.Add($" *Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.*");
                         var successTransactions = transactions.Where(tr => tr.txreceipt_status == "1");
                         try
                         {
@@ -144,6 +138,73 @@ namespace AnalyzerCore
                         {
                             tgMsgs.Add("No Transaction in this interval");
                         }
+                        if (address == OurAddress)
+                        {
+                            tgMsgs.Add($" --> Result of Gas Analysis on this cycle");
+                            /*
+                             * gasPrice <= 5.000005
+                             * gasPrice > 5.000005 && gasPrice < 7.500005
+                             * gasPrice >= 7.500005 && gasPrice < 10
+                             * gasPrice >= 10 && gasPrice < 15
+                             * gasPrice >= 15 && gasPrice < 25
+                             * gasPrice >= 25 && gasPrice < 35
+                             * gasPrice >= 35 && gasPrice < 45
+                             * gasPrice >= 45 && gasPrice < 60
+                             * else*/
+                            List<Range> ranges = new List<Range>();
+                            ranges.Add(new Range
+                            {
+                                rangeName = "x<=5000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) <= 5000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "5000005000>x<7000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 5000005000 && long.Parse(x.gasPrice) < 7000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "7000005000>x<10000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 7000005000 && long.Parse(x.gasPrice) < 10000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "10000005000>x<15000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 10000005000 && long.Parse(x.gasPrice) < 15000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "15000005000>x<25000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 15000005000 && long.Parse(x.gasPrice) < 25000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "25000005000>x<35000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 25000005000 && long.Parse(x.gasPrice) < 35000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "35000005000>x<45000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 35000005000 && long.Parse(x.gasPrice) < 45000005000).ToList()
+                            });
+                            ranges.Add(new Range
+                            {
+                                rangeName = "45000005000>x<60000005000",
+                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 45000005000 && long.Parse(x.gasPrice) < 60000005000).ToList()
+                            });
+                            foreach (var range in ranges)
+                            {
+                                try
+                                {
+                                    long sr = 100 * range.trxInRange.Where(x => x.txreceipt_status == "1").Count() / range.trxInRange.Count();
+                                    tgMsgs.Add($" --> Range: {range.rangeName}, avgGas: {range.trxInRange.Select(x => long.Parse(x.gasPrice)).ToList().Sum() / range.trxInRange.Count()}, total trx: {range.trxInRange.Count()}, success rate: {sr}%");
+                                }
+                                catch (System.DivideByZeroException)
+                                {
+                                    telegramNotifier.SendMessage(" --> No trx in this interval");
+                                }
+                            }
+                        }
                     }
 
                     // Analyze Failed trx
@@ -152,7 +213,7 @@ namespace AnalyzerCore
                         var trxToNotify = t.Where(t => !trxHashAlerted.Contains(t.hash)).ToList();
                         foreach(var tn in trxToNotify)
                         {
-                            telegramNotifier.SendMessage($"Tx failed: {tn.hash} with gasUsed: {tn.gasUsed}");
+                            telegramNotifier.SendMessage($"Tx failed: https://bscscan.com/tx/{tn.hash} with gasUsed: {tn.gasUsed}");
                             trxHashAlerted.Add(tn.hash);
                         }
 
@@ -168,6 +229,17 @@ namespace AnalyzerCore
 
         static void Main(string[] args)
         {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
+                .Build();
+
+            var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
+            XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
+            ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
+
+            //CreateHostBuilder(args).Build().Run();
+
             try
             {
                 MainAsync().Wait();
@@ -175,6 +247,24 @@ namespace AnalyzerCore
             catch (Exception ex)
             {
                 log.Error(ex);
+            }
+        }
+
+        /*public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .ConfigureServices(services =>
+            {
+                services.AddHostedService<VideosWatcher>();
+            });*/
+
+        public class Range : IEnumerable
+        {
+            public string rangeName { get; set; }
+            public List<Result> trxInRange { get; set; }
+
+            public IEnumerator GetEnumerator()
+            {
+                throw new NotImplementedException();
             }
         }
     }
