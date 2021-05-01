@@ -126,12 +126,23 @@ namespace AnalyzerCore
                     {
                         int firstBlock = int.Parse(currentBlock) - numberOfBlocks;
                         var transactions = trx.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
-                        tgMsgs.Add($" *Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.*");
+                        if (address == OurAddress)
+                        {
+                            tgMsgs.Add($" *Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.*");
+                        }
                         var successTransactions = transactions.Where(tr => tr.txreceipt_status == "1");
                         try
                         {
                             long successRate = 100 * successTransactions.Count() / transactions.Count();
-                            string _msg = $" -> Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
+                            string _msg = "";
+                            if (address == OurAddress)
+                            {
+                                _msg = $" -> Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
+                            } else
+                            {
+                                _msg = $" -> {numberOfBlocks} blocks = Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
+                            }
+                            
                             tgMsgs.Add(_msg);
                         }
                         catch (System.DivideByZeroException)
@@ -141,16 +152,6 @@ namespace AnalyzerCore
                         if (address == OurAddress)
                         {
                             tgMsgs.Add($" --> Result of Gas Analysis on this cycle");
-                            /*
-                             * gasPrice <= 5.000005
-                             * gasPrice > 5.000005 && gasPrice < 7.500005
-                             * gasPrice >= 7.500005 && gasPrice < 10
-                             * gasPrice >= 10 && gasPrice < 15
-                             * gasPrice >= 15 && gasPrice < 25
-                             * gasPrice >= 25 && gasPrice < 35
-                             * gasPrice >= 35 && gasPrice < 45
-                             * gasPrice >= 45 && gasPrice < 60
-                             * else*/
                             List<Range> ranges = new List<Range>();
                             ranges.Add(new Range
                             {
@@ -201,7 +202,7 @@ namespace AnalyzerCore
                                 }
                                 catch (System.DivideByZeroException)
                                 {
-                                    tgMsgs.Add(" --> No trx in this interval");
+                                    log.Info($"No trx in gas Range: {range.rangeName}");
                                 }
                             }
                         }
