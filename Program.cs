@@ -201,7 +201,7 @@ namespace AnalyzerCore
                                 }
                                 catch (System.DivideByZeroException)
                                 {
-                                    telegramNotifier.SendMessage(" --> No trx in this interval");
+                                    tgMsgs.Add(" --> No trx in this interval");
                                 }
                             }
                         }
