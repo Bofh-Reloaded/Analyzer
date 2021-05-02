@@ -100,7 +100,8 @@ namespace AnalyzerCore
                 "0x135950adfda533dc212535093c4c4e5a62fc9195",
                 "0x6dd596eec44067d80ca2122e757ab806f551e521",
                 "0x23267395057554d62e144323d0fa7dc0c0550d69",
-                "0x1ad83ec9cc98aca1898fd1c9e4475717851301f9"
+                "0x1ad83ec9cc98aca1898fd1c9e4475717851301f9",
+                "0x284c69b0c29ebde7b2e2b87cd9a077ba4c120ff5"
             };
             List<string> trxHashAlerted = new List<string>();
 
@@ -119,7 +120,6 @@ namespace AnalyzerCore
                 foreach (var address in Addresses) {
                     var trx = await GetTransactionsByAddressAsync(address, startBlock.ToString(), endBlock: currentBlock);
                     log.Info($"Total: {trx.Count} trx retrieved.");
-                    tgMsgs.Add($"*[{address}]*");
 
                     // Start Analyze
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
@@ -128,6 +128,7 @@ namespace AnalyzerCore
                         var transactions = trx.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
                         if (address == OurAddress)
                         {
+                            tgMsgs.Add($"*[{address}]*");
                             tgMsgs.Add($" *Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.*");
                         }
                         var successTransactions = transactions.Where(tr => tr.txreceipt_status == "1");
@@ -140,7 +141,7 @@ namespace AnalyzerCore
                                 _msg = $" -> Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
                             } else
                             {
-                                _msg = $" -> {numberOfBlocks} blocks = Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
+                                _msg = $"*[{address}]* -> B: {numberOfBlocks} S TRX: {successTransactions.Count()}/{transactions.Count()}; SR: *{successRate}%*";
                             }
                             
                             tgMsgs.Add(_msg);
@@ -230,10 +231,10 @@ namespace AnalyzerCore
 
         static void Main(string[] args)
         {
-            IConfiguration configuration = new ConfigurationBuilder()
+            /*IConfiguration configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();
+                .Build();*/
 
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
@@ -267,6 +268,18 @@ namespace AnalyzerCore
             {
                 throw new NotImplementedException();
             }
+        }
+
+        public class Address
+        {
+            public string address { get; set; }
+            public List<Result> transactions { get; set; }
+
+            public List<Result> GetTransactions(int numberOfBlocks)
+            {
+                return this.transactions;
+            }
+
         }
     }
 }
