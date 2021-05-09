@@ -30,45 +30,7 @@ namespace AnalyzerCore
         //implementare comando via bot per richiamare analisi all'interno di un block range
         private static TelegramNotifier telegramNotifier = new TelegramNotifier();
         public static IConfigurationRoot configuration;
-
-
-        /*
-        static TransactionReceipt()
-        {
-            
-                // Create HTTP Client (to be moved inside a container class)
-                HttpClient c = new HttpClient();
-                c.DefaultRequestHeaders.Accept.Clear();
-                c.DefaultRequestHeaders.Accept.Add(
-                    new MediaTypeWithQualityHeaderValue("application/json")
-                    );
-
-                Parallel.ForEach(trx.result, new ParallelOptions { MaxDegreeOfParallelism = 2 }, async tr =>
-                {
-                    // Retrieve Event Log for the trx
-                    log.Debug($"Current trx: {tr.hash} and block: {tr.blockNumber} txreceipt_status: {tr.txreceipt_status}");
-                    //log.Debug(JsonConvert.SerializeObject(tr, Formatting.Indented));
-                    TransactionReceiptJsonRequest jsonRequest = new TransactionReceiptJsonRequest();
-                    jsonRequest.Id = 1;
-                    jsonRequest.Method = "eth_getTransactionReceipt";
-                    jsonRequest.Jsonrpc = "2.0";
-                    jsonRequest.Params = new List<string>();
-                    jsonRequest.Params.Add(tr.hash);
-
-                    var content = new StringContent(JsonConvert.SerializeObject(jsonRequest), Encoding.UTF8, "application/json");
-                    try
-                    {
-                        HttpResponseMessage response = await c.PostAsync(requestUri: "http://18.192.76.89:8545/ ", content: content);
-                        TransactionReceipt trr = JsonConvert.DeserializeObject<TransactionReceipt>(await response.Content.ReadAsStringAsync());
-                        log.Debug(JsonConvert.SerializeObject(trr.result, Formatting.Indented));
-                    } catch (Exception ex)
-                    {
-                        log.Error($"Failed to retrieve Transaction Receipt for trx: {tr.hash} with Exception: {ex}");
-                    }   
-                });
-                
-        }
-        */
+        public static List<string> addresses = new List<string>();
 
         public static async Task<List<Result>> GetTransactionsByAddressAsync(string address, string startBlock, string endBlock)
         {
@@ -93,16 +55,6 @@ namespace AnalyzerCore
         private static async Task MainAsync()
         {
             log.Info("Creating Service Collection");
-
-            var Addresses = new List<string>()
-            {
-                OurAddress,
-                "0x135950adfda533dc212535093c4c4e5a62fc9195",
-                "0x6dd596eec44067d80ca2122e757ab806f551e521",
-                "0x23267395057554d62e144323d0fa7dc0c0550d69",
-                "0x1ad83ec9cc98aca1898fd1c9e4475717851301f9",
-                "0x284c69b0c29ebde7b2e2b87cd9a077ba4c120ff5"
-            };
             List<string> trxHashAlerted = new List<string>();
 
             log.Info("Bot Started");
@@ -116,10 +68,11 @@ namespace AnalyzerCore
 
                 //Retrieve Transactions for the last n blocks
                 int startBlock = int.Parse(currentBlock) - numbersOfBlocksToAnalyze.Max();
-
-                foreach (var address in Addresses) {
+               
+                foreach (var address in addresses) {
                     var trx = await GetTransactionsByAddressAsync(address, startBlock.ToString(), endBlock: currentBlock);
                     log.Info($"Total: {trx.Count} trx retrieved.");
+                    tgMsgs.Add($"*[{address}]*");
 
                     // Start Analyze
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
@@ -128,7 +81,6 @@ namespace AnalyzerCore
                         var transactions = trx.Where(tr => int.Parse(tr.blockNumber) >= firstBlock);
                         if (address == OurAddress)
                         {
-                            tgMsgs.Add($"*[{address}]*");
                             tgMsgs.Add($" *Block Range: {firstBlock.ToString()} to {currentBlock}: {numberOfBlocks} blocks.*");
                         }
                         var successTransactions = transactions.Where(tr => tr.txreceipt_status == "1");
@@ -141,7 +93,7 @@ namespace AnalyzerCore
                                 _msg = $" -> Total trx: {transactions.Count()}; Successfull: {successTransactions.Count()}; SR: *{successRate}%*";
                             } else
                             {
-                                _msg = $"*[{address}]* -> B: {numberOfBlocks} S TRX: {successTransactions.Count()}/{transactions.Count()}; SR: *{successRate}%*";
+                                _msg = $"B: {numberOfBlocks} S TRX: {successTransactions.Count()}/{transactions.Count()}; SR: *{successRate}%*";
                             }
                             
                             tgMsgs.Add(_msg);
@@ -231,10 +183,14 @@ namespace AnalyzerCore
 
         static void Main(string[] args)
         {
-            /*IConfiguration configuration = new ConfigurationBuilder()
+            IConfiguration configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();*/
+                .Build();
+
+            var section = configuration.GetSection("enemies");
+            addresses = section.Get<List<string>>();
+            addresses.Add(OurAddress);
 
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
@@ -283,3 +239,41 @@ namespace AnalyzerCore
         }
     }
 }
+
+/*
+static TransactionReceipt()
+{
+
+        // Create HTTP Client (to be moved inside a container class)
+        HttpClient c = new HttpClient();
+        c.DefaultRequestHeaders.Accept.Clear();
+        c.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json")
+            );
+
+        Parallel.ForEach(trx.result, new ParallelOptions { MaxDegreeOfParallelism = 2 }, async tr =>
+        {
+            // Retrieve Event Log for the trx
+            log.Debug($"Current trx: {tr.hash} and block: {tr.blockNumber} txreceipt_status: {tr.txreceipt_status}");
+            //log.Debug(JsonConvert.SerializeObject(tr, Formatting.Indented));
+            TransactionReceiptJsonRequest jsonRequest = new TransactionReceiptJsonRequest();
+            jsonRequest.Id = 1;
+            jsonRequest.Method = "eth_getTransactionReceipt";
+            jsonRequest.Jsonrpc = "2.0";
+            jsonRequest.Params = new List<string>();
+            jsonRequest.Params.Add(tr.hash);
+
+            var content = new StringContent(JsonConvert.SerializeObject(jsonRequest), Encoding.UTF8, "application/json");
+            try
+            {
+                HttpResponseMessage response = await c.PostAsync(requestUri: "http://18.192.76.89:8545/ ", content: content);
+                TransactionReceipt trr = JsonConvert.DeserializeObject<TransactionReceipt>(await response.Content.ReadAsStringAsync());
+                log.Debug(JsonConvert.SerializeObject(trr.result, Formatting.Indented));
+            } catch (Exception ex)
+            {
+                log.Error($"Failed to retrieve Transaction Receipt for trx: {tr.hash} with Exception: {ex}");
+            }   
+        });
+
+}
+*/

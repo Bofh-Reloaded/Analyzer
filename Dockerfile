@@ -16,5 +16,6 @@ RUN dotnet publish "AnalyzerCore.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
+COPY ["appSettings.json", "."]
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "AnalyzerCore.dll"]
