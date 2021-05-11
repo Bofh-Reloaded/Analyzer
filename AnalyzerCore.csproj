@@ -20,5 +20,12 @@
   <ItemGroup>
     <Folder Include="Notifier\" />
     <Folder Include="Libs\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="appSettings.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="appSettings.json" />
   </ItemGroup>
 </Project>

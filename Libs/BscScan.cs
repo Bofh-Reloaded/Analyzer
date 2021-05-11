@@ -27,7 +27,7 @@ namespace AnalyzerCore.Libs
                 );
         }
         
-        public async Task<string> GetCurrentBlock()
+        public async Task<CurrentBlock> GetCurrentBlock()
         {
             var unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             var requestUri = $"api?module=block&action=getblocknobytime&timestamp={unixTimestamp}&closest=before&apikey={apiToken}";
@@ -35,7 +35,7 @@ namespace AnalyzerCore.Libs
             CurrentBlock currentBlock = JsonSerializer.Deserialize<CurrentBlock>(
                 await response.Content.ReadAsStringAsync()
                 );
-            return currentBlock.result;
+            return currentBlock;
         }
 
         public async Task<Transaction> RetrieveTransactionsAsync(string address, string startBlock, string endBlock)
@@ -46,7 +46,8 @@ namespace AnalyzerCore.Libs
             {
                 var requestUri = $"api?module=account&action=txlist&address={address}&startblock={startBlock}&endblock={endBlock}&sort=asc&apikey={apiToken}";
                 HttpResponseMessage response = await Client.GetAsync(requestUri: requestUri);
-                trx = JsonSerializer.Deserialize<Transaction>(await response.Content.ReadAsStringAsync());
+                string content = await response.Content.ReadAsStringAsync();
+                trx = JsonSerializer.Deserialize<Transaction>(content);
             }
             catch (Exception ex)
             {
