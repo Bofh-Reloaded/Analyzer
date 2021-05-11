@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Hosting;
 using log4net;
 using System.Reflection;
 using System.Threading.Tasks;
