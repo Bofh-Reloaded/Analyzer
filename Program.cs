@@ -35,9 +35,12 @@ namespace AnalyzerCore
             {
                 services.AddHostedService<AnalyzerService>(s => new AnalyzerService(SharedTrxData));
                 services.AddHostedService<FailedTrxService>(s => new FailedTrxService(SharedTrxData));
+                services.AddHostedService<GasAnalyzerService>(s => new GasAnalyzerService(SharedTrxData));
             });
     }
 }
+
+
 
 /*
 static TransactionReceipt()

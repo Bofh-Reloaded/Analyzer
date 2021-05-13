@@ -27,6 +27,11 @@ namespace AnalyzerCore.Models.BscScanModels
         public string cumulativeGasUsed { get; set; }
         public string gasUsed { get; set; }
         public string confirmations { get; set; }
+
+        public double getGasPrice()
+        {
+            return double.Parse(gasPrice) / Math.Pow(10, 9);
+        }
     }
 
     public class Transaction

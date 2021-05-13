@@ -11,7 +11,7 @@ using System.Linq;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using AnalyzerCore.Notifier;
-using Range = AnalyzerCore.Models.Range;
+
 
 namespace AnalyzerCore.Services
 {
@@ -44,14 +44,17 @@ namespace AnalyzerCore.Services
                 .AddJsonFile("appSettings.json", false, reloadOnChange: true)
                 .Build();
             Options options = new Options();
+
+
             configuration.GetSection(nameof(Options)).Bind(options);
+
             //ourAddress = configuration.GetSection("ourAddress").Get<string>();
             ourAddress = "0x153e170524cfad4261743ce8bd8053e15d6d1f15";
             var section = configuration.GetSection("enemies");
             addresses = section.Get<List<string>>();
             addresses.Add(ourAddress);
-            this.SharedData = data;
 
+            this.SharedData = data;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -114,63 +117,6 @@ namespace AnalyzerCore.Services
                         catch (System.DivideByZeroException)
                         {
                             tgMsgs.Add("No Transaction in this interval");
-                        }
-                        if (address == ourAddress)
-                        {
-                            tgMsgs.Add($" --> Result of Gas Analysis on this cycle");
-                            List<Range> ranges = new List<Range>();
-                            ranges.Add(new Range
-                            {
-                                rangeName = "x<=5000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) <= 5000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "5000005000>x<7000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 5000005000 && long.Parse(x.gasPrice) < 7000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "7000005000>x<10000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 7000005000 && long.Parse(x.gasPrice) < 10000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "10000005000>x<15000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 10000005000 && long.Parse(x.gasPrice) < 15000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "15000005000>x<25000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 15000005000 && long.Parse(x.gasPrice) < 25000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "25000005000>x<35000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 25000005000 && long.Parse(x.gasPrice) < 35000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "35000005000>x<45000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 35000005000 && long.Parse(x.gasPrice) < 45000005000).ToList()
-                            });
-                            ranges.Add(new Range
-                            {
-                                rangeName = "45000005000>x<60000005000",
-                                trxInRange = transactions.Where(x => long.Parse(x.gasPrice) > 45000005000 && long.Parse(x.gasPrice) < 60000005000).ToList()
-                            });
-                            foreach (var range in ranges)
-                            {
-                                try
-                                {
-                                    long sr = 100 * range.trxInRange.Where(x => x.txreceipt_status == "1").Count() / range.trxInRange.Count();
-                                    tgMsgs.Add($" --> Range: {range.rangeName}, avgGas: {range.trxInRange.Select(x => long.Parse(x.gasPrice)).ToList().Sum() / range.trxInRange.Count()}, total trx: {range.trxInRange.Count()}, success rate: {sr}%");
-                                }
-                                catch (System.DivideByZeroException)
-                                {
-                                    log.Debug($"No trx in gas Range: {range.rangeName}");
-                                }
-                            }
                         }
                     }
 

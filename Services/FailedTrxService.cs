@@ -14,16 +14,17 @@ namespace AnalyzerCore.Services
         private readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
-        private readonly int taskDelayMs = 500;
+        private readonly int taskDelayMs = 120000;
         private string ourAddress = "0x153e170524cfad4261743ce8bd8053e15d6d1f15";
         private TelegramNotifier telegramNotifier = new TelegramNotifier();
         private List<string> trxHashAlerted = new List<string>();
 
         public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>();
+        public Dictionary<string, List<Result>> State = new Dictionary<string, List<Result>>();
 
         public FailedTrxService(Dictionary<string, List<Result>> data)
         {
-            log.Info("Failed Trx Notifier Service starting...");
+            log.Info("FailedTrxService starting...");
             this.SharedData = data;
         }
 
@@ -31,6 +32,12 @@ namespace AnalyzerCore.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                /*if (SharedData.Except(State).Count() == 0)
+                {
+                    log.Info("Dictionary is not changed yet, skipping cycle.");
+                    await Task.Delay(10000);
+                    continue;
+                }*/
                 var trx = new List<Result>();
                 try
                 {
@@ -53,6 +60,7 @@ namespace AnalyzerCore.Services
                     telegramNotifier.SendMessage($"Tx failed: https://bscscan.com/tx/{tn.hash} with gasUsed: {tn.gasUsed}");
                     trxHashAlerted.Add(tn.hash);
                 }
+                State = SharedData;
 
                 await Task.Delay(taskDelayMs, stoppingToken);
             }
