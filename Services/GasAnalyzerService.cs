@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using AnalyzerCore.Models;
 using AnalyzerCore.Models.BscScanModels;
 using AnalyzerCore.Notifier;
 using log4net;
@@ -20,7 +19,6 @@ namespace AnalyzerCore.Services
         private readonly int taskDelayMs = 120000;
         private string ourAddress = "0x153e170524cfad4261743ce8bd8053e15d6d1f15";
         private TelegramNotifier telegramNotifier = new TelegramNotifier();
-        private List<string> trxHashAlerted = new List<string>();
 
         public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>();
         public Dictionary<string, List<Result>> State = new Dictionary<string, List<Result>>();
