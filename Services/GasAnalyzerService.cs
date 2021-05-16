@@ -33,12 +33,6 @@ namespace AnalyzerCore.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                /*if (SharedData.Except(State).Count() == 0)
-                {
-                    log.Info("Dictionary is not changed yet, skipping cycle.");
-                    await Task.Delay(30000);
-                    continue;
-                }*/
                 var trx = new List<Result>();
                 try
                 {

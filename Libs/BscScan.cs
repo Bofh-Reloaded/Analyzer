@@ -29,7 +29,7 @@ namespace AnalyzerCore.Libs
         
         public async Task<CurrentBlock> GetCurrentBlock()
         {
-            var unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 3000;
             var requestUri = $"api?module=block&action=getblocknobytime&timestamp={unixTimestamp}&closest=before&apikey={apiToken}";
             HttpResponseMessage response = await Client.GetAsync(requestUri: requestUri);
             CurrentBlock currentBlock = JsonSerializer.Deserialize<CurrentBlock>(
