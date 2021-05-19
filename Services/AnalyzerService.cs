@@ -28,7 +28,7 @@ namespace AnalyzerCore.Services
         private readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
-        private readonly int taskDelayMs = 30000;
+        private readonly int taskDelayMs = 120000;
         private BscScan bscScanApiClient = new BscScan();
         private static List<int> numbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
         public IConfigurationRoot configuration;
@@ -102,6 +102,7 @@ namespace AnalyzerCore.Services
                         {
                             tgMsgs.Add("No Transaction in this interval");
                         }
+                        Thread.Sleep(500);
                     }
 
                 }

@@ -9,7 +9,7 @@ using log4net;
 
 namespace AnalyzerCore.Services
 {
-    public class FailedTrxService : BackgroundService
+    public class AnalyzeTheBastard : BackgroundService
     {
         private readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
@@ -22,7 +22,7 @@ namespace AnalyzerCore.Services
         public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>();
         public Dictionary<string, List<Result>> State = new Dictionary<string, List<Result>>();
 
-        public FailedTrxService(Dictionary<string, List<Result>> data)
+        public AnalyzeTheBastard(Dictionary<string, List<Result>> data)
         {
             log.Info("FailedTrxService starting...");
             this.SharedData = data;

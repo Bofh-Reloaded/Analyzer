@@ -41,17 +41,18 @@ namespace AnalyzerCore.Libs
         public async Task<Transaction> RetrieveTransactionsAsync(string address, string startBlock, string endBlock)
         {
             var trx = new Transaction();
-
+            string content = "";
             try
             {
                 var requestUri = $"api?module=account&action=txlist&address={address}&startblock={startBlock}&endblock={endBlock}&sort=asc&apikey={apiToken}";
                 HttpResponseMessage response = await Client.GetAsync(requestUri: requestUri);
-                string content = await response.Content.ReadAsStringAsync();
+                content = await response.Content.ReadAsStringAsync();
                 trx = JsonSerializer.Deserialize<Transaction>(content);
             }
             catch (Exception ex)
             {
                 log.Error(ex.ToString());
+                log.Error(content);
             }
 
             return trx;
