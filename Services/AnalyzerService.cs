@@ -35,7 +35,7 @@ namespace AnalyzerCore.Services
         public List<string> addresses = new List<string>();
         private TelegramNotifier telegramNotifier = new TelegramNotifier();
         public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>(); 
-        private Web3 web3 = new Web3("http://54.38.179.226:8545");
+        private Web3 web3 = new Web3("https://bsc-dataseed.binance.org");
 
         private string ourAddress;
 
