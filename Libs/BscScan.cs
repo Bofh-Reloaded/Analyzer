@@ -53,8 +53,8 @@ namespace AnalyzerCore.Libs
             {
                 log.Error(ex.ToString());
                 log.Error(content);
+                throw ex;
             }
-
             return trx;
         }
     }

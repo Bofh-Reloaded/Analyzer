@@ -80,7 +80,15 @@ namespace AnalyzerCore.Services
 
                 foreach (var address in addresses)
                 {
-                    var trx = await GetTransactionsByAddressAsync(address, startBlock.ToString(), endBlock: currentBlock.Value.ToString());
+                    var trx = new List<Result>();
+                    try
+                    {
+                        trx = await GetTransactionsByAddressAsync(address, startBlock.ToString(), endBlock: currentBlock.Value.ToString());
+                    } catch
+                    {
+                        log.Error($"Cannot retrieve transactions for address: {address}, skipping.");
+                        continue;
+                    }
                     SharedData[address] = trx;
                     log.Info($"[{address}] => Total: {trx.Count} trx retrieved.");
                     tgMsgs.Add($"*[{address}]*");
