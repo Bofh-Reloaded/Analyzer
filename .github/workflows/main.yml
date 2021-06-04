@@ -1,0 +1,23 @@
+name: Docker
+
+on: push
+env:
+  IMAGE_NAME: analyzer
+
+jobs:
+  push:
+
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Login to DockerHub Registry
+        run: echo "790f069f-e3ee-4be3-b2d0-ebe549676d69" | docker login -u $GITHUB_ACTOR --password-stdin
+
+      - name: Build image
+        run: docker build -tag analyzer:latest .
+        
+      - name: Push image
+        run: docker push analyzer:latest
