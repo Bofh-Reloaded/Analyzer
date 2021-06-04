@@ -20,4 +20,4 @@ jobs:
         run: docker build -t analyzer:latest .
         
       - name: Push image
-        run: docker push analyzer:latest
+        run: docker push $GITHUB_ACTOR/analyzer:latest
