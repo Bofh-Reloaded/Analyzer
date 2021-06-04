@@ -17,7 +17,7 @@ jobs:
         run: echo "790f069f-e3ee-4be3-b2d0-ebe549676d69" | docker login -u $GITHUB_ACTOR --password-stdin
 
       - name: Build image
-        run: docker build -tag analyzer:latest .
+        run: docker build -t analyzer:latest .
         
       - name: Push image
         run: docker push analyzer:latest
