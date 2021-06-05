@@ -16,7 +16,7 @@ namespace AnalyzerCore
 {
     class Program
     {
-        // Test
+        // Test2
         private static readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
