@@ -23,6 +23,25 @@ namespace AnalyzerCore.Services
         public string ourAddress { get; set; }
     }
 
+    public class BlockRangeStats
+    {
+        public int BlockRange { get; set; }
+        public int SuccededTranstactionsPerBlockRange { get; set; }
+        public int TotalTransactionsPerBlockRange { get; set; }
+        public string SuccessRate { get; set; }
+    }
+    public class AddressStats
+    {
+        public string Address { get; set; }
+        public List<BlockRangeStats> BlockRanges { get; set; }
+    }
+
+    public class Message
+    {
+        public string Timestamp { get; set; }
+        public List<AddressStats> Addresses { get; set; }
+    }
+
     public class AnalyzerService : BackgroundService
     {
         private readonly ILog log = LogManager.GetLogger(
@@ -70,8 +89,9 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 log.Info("New Analsys Cycle");
-                List<string> tgMsgs = new List<string>();
-                tgMsgs.Add($"*[{DateTime.Now}]*");
+                var msg = new Message();
+                msg.Addresses = new List<AddressStats>();
+                msg.Timestamp = $"*[{DateTime.Now}]*";
 
                 HexBigInteger currentBlock = await web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
 
@@ -80,6 +100,7 @@ namespace AnalyzerCore.Services
 
                 foreach (var address in addresses)
                 {
+                    var addrStats = new AddressStats();
                     var trx = new List<Result>();
                     try
                     {
@@ -91,7 +112,8 @@ namespace AnalyzerCore.Services
                     }
                     SharedData[address] = trx;
                     log.Info($"[{address}] => Total: {trx.Count} trx retrieved.");
-                    tgMsgs.Add($"*[{address}]*");
+                    addrStats.Address = $"*[{address}]*";
+                    addrStats.BlockRanges = new List<BlockRangeStats>();
 
                     // Start Analyze
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
@@ -102,21 +124,23 @@ namespace AnalyzerCore.Services
                         try
                         {
                             long successRate = 100 * successTransactions.Count() / transactions.Count();
-                            string _msg = "";
-                            _msg = $"B: {numberOfBlocks} S TRX: {successTransactions.Count()}/{transactions.Count()}; SR: *{successRate}%*";
-                            tgMsgs.Add(_msg);
+                            BlockRangeStats blockRangeStats = new BlockRangeStats();
+                            blockRangeStats.BlockRange = numberOfBlocks;
+                            blockRangeStats.SuccededTranstactionsPerBlockRange = successTransactions.Count();
+                            blockRangeStats.TotalTransactionsPerBlockRange = transactions.Count();
+                            blockRangeStats.SuccessRate = $"{successRate}%";
+                            addrStats.BlockRanges.Add(blockRangeStats);
                         }
                         catch (System.DivideByZeroException)
                         {
-                            tgMsgs.Add("No Transaction in this interval");
+                            continue;
                         }
-                        Thread.Sleep(500);
+                        Thread.Sleep(50);
                     }
-
+                    msg.Addresses.Add(addrStats);
                 }
 
-                string finalMsg = string.Join(Environment.NewLine, tgMsgs.ToArray());
-                telegramNotifier.SendMessage(finalMsg);
+                telegramNotifier.SendMessage(JsonSerializer.Serialize(msg, new JsonSerializerOptions { WriteIndented = true }).ToString());
 
                 await Task.Delay(taskDelayMs, stoppingToken);
             }

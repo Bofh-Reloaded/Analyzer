@@ -32,7 +32,7 @@ namespace AnalyzerCore.Notifier
             Message result = await _Bot.SendTextMessageAsync(
                             chatId: this._chatId,
                             text: text,
-                            parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown
+                            parseMode: Telegram.Bot.Types.Enums.ParseMode.Default
                             );
         }
     }
