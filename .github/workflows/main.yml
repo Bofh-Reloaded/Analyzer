@@ -17,7 +17,7 @@ jobs:
         run: echo ${{ secrets.docker_hub_secret }} | docker login -u mtrimarchi --password-stdin
 
       - name: Build image
-        run: docker build -t $GITHUB_ACTOR/analyzer:latest .
+        run: docker build -t mtrimarchi/analyzer:latest .
         
       - name: Push image
-        run: docker push $GITHUB_ACTOR/analyzer:latest
+        run: docker push mtrimarchi/analyzer:latest
