@@ -8,15 +8,11 @@ using Microsoft.Extensions.Hosting;
 using AnalyzerCore.Services;
 using System.Collections.Generic;
 using AnalyzerCore.Models.BscScanModels;
-using Nethereum.Web3;
-
-// TODO: implementare comando via bot per richiamare analisi all'interno di un block range
 
 namespace AnalyzerCore
 {
     class Program
     {
-        // Test2
         private static readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
@@ -35,9 +31,9 @@ namespace AnalyzerCore
         Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
             {
-                services.AddHostedService<AnalyzerService>(s => new AnalyzerService(SharedTrxData));
+                services.AddHostedService<PlyAnalyzerService>(s => new PlyAnalyzerService(SharedTrxData));
                 //services.AddHostedService<FailedTrxService>(s => new FailedTrxService(SharedTrxData));
-                services.AddHostedService<GasAnalyzerService>(s => new GasAnalyzerService(SharedTrxData));
+                //services.AddHostedService<GasAnalyzerService>(s => new GasAnalyzerService(SharedTrxData));
             });
     }
 }

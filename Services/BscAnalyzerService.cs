@@ -14,35 +14,11 @@ using AnalyzerCore.Notifier;
 using Nethereum.Web3;
 using Nethereum.Hex.HexTypes;
 using System.Numerics;
+using AnalyzerCore.Models;
 
 namespace AnalyzerCore.Services
 {
-    public class Options
-    {
-        public List<string> addresses { get; set; }
-        public string ourAddress { get; set; }
-    }
-
-    public class BlockRangeStats
-    {
-        public int BlockRange { get; set; }
-        public int SuccededTranstactionsPerBlockRange { get; set; }
-        public int TotalTransactionsPerBlockRange { get; set; }
-        public string SuccessRate { get; set; }
-    }
-    public class AddressStats
-    {
-        public string Address { get; set; }
-        public List<BlockRangeStats> BlockRanges { get; set; }
-    }
-
-    public class Message
-    {
-        public string Timestamp { get; set; }
-        public List<AddressStats> Addresses { get; set; }
-    }
-
-    public class AnalyzerService : BackgroundService
+    public class BscAnalyzerService : BackgroundService
     {
         private readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
@@ -58,7 +34,7 @@ namespace AnalyzerCore.Services
 
         private string ourAddress;
 
-        public AnalyzerService(Dictionary<string, List<Result>> data)
+        public BscAnalyzerService(Dictionary<string, List<Result>> data)
         {
             log.Info("AnalyzerService Starting");
             IConfiguration configuration = new ConfigurationBuilder()
