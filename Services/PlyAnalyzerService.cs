@@ -164,7 +164,7 @@ namespace AnalyzerCore.Services
                         }
                         try
                         {
-                            long successRate = 100 * succededTrxs.Count() / addrTrxs.Take(numberOfBlocks).Count();
+                            long successRate = 100 * succededTrxs.Count() / trxToAnalyze.Count();
                             BlockRangeStats blockRangeStats = new BlockRangeStats();
                             blockRangeStats.BlockRange = numberOfBlocks;
                             blockRangeStats.SuccededTranstactionsPerBlockRange = succededTrxs.Count();
