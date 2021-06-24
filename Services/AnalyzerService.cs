@@ -4,12 +4,9 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Collections.Generic;
-using AnalyzerCore.Libs;
-using AnalyzerCore.Models.BscScanModels;
 using System.Text.Json;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
-using System.IO;
 using AnalyzerCore.Notifier;
 using Nethereum.Web3;
 using Nethereum.Hex.HexTypes;
@@ -19,54 +16,58 @@ using System.Collections.Concurrent;
 
 namespace AnalyzerCore.Services
 {
-    public class PlyAnalyzerService : BackgroundService
+    public class AnalyzerService : BackgroundService
     {
+        // Initialize Logger
         private readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
+
+        // Define the delay between one cycle and another
         private readonly int taskDelayMs = 360000;
-        private BscScan bscScanApiClient = new BscScan();
+
+        // Array of block to analyze
         private static List<int> numbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
-        private TelegramNotifier telegramNotifier = new TelegramNotifier(chatId: "-532850503");
+
+        // Define the TelegramNotifier Instance
+        private TelegramNotifier telegramNotifier;
+
+        // Define Web3 (Nethereum) client
         private Web3 web3;
+
+        // Initialize empty string that we will use to fill with our address on this chain, probably will be removed
         private string ourAddress;
 
+        // String Value representing the chain name
+        private string chainName;
+
+        // Initiliaze configuration accessor
         public IConfigurationRoot configuration;
+
+        // Inizialize an empty list of string that will be filled with addresses
         public List<string> addresses = new List<string>();
-        public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>(); 
-      
-        public PlyAnalyzerService(Dictionary<string, List<Result>> data, string uri= "http://162.55.94.149:8545")
+        private string uri;
+
+        public AnalyzerService(
+            string chainName,
+            string uri,
+            List<string> addresses)
         {
-            log.Info("AnalyzerService Starting");
-            IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();
-            Options options = new Options();
+            // Filling instance variable
+            this.chainName = chainName;
+            this.addresses = addresses;
 
-            this.web3 = new Web3(uri);
-
-            configuration.GetSection(nameof(Options)).Bind(options);
-
-            var _s = configuration.GetSection("PlyAddress");
-            var ourAddress = _s.Get<string>();
-            var section = configuration.GetSection("PlyEnemies");
-            try {
-                var addresses = section.Get<List<string>>();
-            } catch (System.NullReferenceException)
-            {
-                var addresses = new List<string>();
-            }
-            addresses.Add(ourAddress);
-            this.SharedData = data;
+            // Registering Nethereum Web3 client endpoint
+            log.Info($"AnalyzerService Initialized for chain: {chainName}");
+            web3 = new Web3(uri);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            log.Info("Starting PlyAnalyzerService");
-            telegramNotifier.SendMessage("Starting PlyAnalyzerService");
+            log.Info($"Starting AnalyzerService for chain: {chainName}");
+            telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {chainName}");
             stoppingToken.Register(() =>
-                log.Info("plyAnalyzerService background task is stopping"));
+                log.Info($"AnalyzerService background task is stopping for chain: {chainName}"));
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -164,6 +165,7 @@ namespace AnalyzerCore.Services
                         }
                         try
                         {
+                            // Calculate the success rate and construct che BlockRangeStat object
                             long successRate = 100 * succededTrxs.Count() / trxToAnalyze.Count();
                             BlockRangeStats blockRangeStats = new BlockRangeStats();
                             blockRangeStats.BlockRange = numberOfBlocks;
@@ -174,7 +176,7 @@ namespace AnalyzerCore.Services
                         }
                         catch (System.DivideByZeroException)
                         {
-                            log.Error("Dio Cane");
+                            log.Error("No transaction retrieved");
                             continue;
                         }
                     }
