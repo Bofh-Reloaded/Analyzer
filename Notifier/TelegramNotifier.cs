@@ -6,6 +6,10 @@ using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using System.Threading;
 using System.Threading.Tasks;
+using AnalyzerCore.Models;
+using System.Text.Json;
+using System.Collections.Generic;
+using Message = AnalyzerCore.Models.Message;
 
 namespace AnalyzerCore.Notifier
 {
@@ -29,53 +33,31 @@ namespace AnalyzerCore.Notifier
         public async void SendMessage(string text)
         {
             log.Debug(text);
-            Message result = await _Bot.SendTextMessageAsync(
+            Telegram.Bot.Types.Message result = await _Bot.SendTextMessageAsync(
                             chatId: this._chatId,
                             text: text,
                             parseMode: Telegram.Bot.Types.Enums.ParseMode.Default
                             );
         }
+
+        public async void SendStatsRecap(Message message)
+        {
+            log.Debug(JsonSerializer.Serialize(message, new JsonSerializerOptions { WriteIndented = true }));
+            List<string> _m = new List<string>();
+            _m.Add(message.Timestamp);
+            foreach (var _a in message.Addresses)
+            {
+                _m.Add($"<b>\U0001F6A7[{_a.Address}]\U0001F6A7</b>");
+                foreach (var _s in _a.BlockRanges)
+                {
+                    _m.Add($" B: {_s.BlockRange} T: {_s.TotalTransactionsPerBlockRange} S: {_s.SuccededTranstactionsPerBlockRange} WR: {_s.SuccessRate}");
+                }
+            }
+            Telegram.Bot.Types.Message result = await _Bot.SendTextMessageAsync(
+                chatId: this._chatId,
+                text: string.Join(Environment.NewLine, _m.ToArray()),
+                parseMode: Telegram.Bot.Types.Enums.ParseMode.Html
+                );
+        }
     }
-
-    /*public class TelegramBotService : IHostedService, IDisposable
-    {
-        private TelegramBotClient _Bot = new TelegramBotClient(
-            token: "1780013642:AAH2nN3rFtRFLQzh4dHd1gjNTdwGWFHrYL8"
-            );
-        private readonly ChatId _chatId = new ChatId(identifier: -560874043);
-        private readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        public TelegramBotService(ILog logger)
-        {
-            _log = logger;
-        }
-
-        public Task StartAsync(CancellationToken stoppingToken)
-        {
-            _log.Info("Telegram Bot Service Started.");
-
-            //_timer = new Timer(DoWork, null, TimeSpan.Zero,
-                TimeSpan.FromSeconds(5));
-
-            return Task.CompletedTask;
-        }
-
-        private void DoWork(object state)
-        {
-        }
-
-        public Task StopAsync(CancellationToken stoppingToken)
-        {
-            _log.Info("Timed Hosted Service is stopping.");
-
-            _timer?.Change(Timeout.Infinite, 0);
-
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            _timer?.Dispose();
-        }
-    }*/
 }

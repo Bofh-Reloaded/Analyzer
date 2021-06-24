@@ -28,14 +28,14 @@ namespace AnalyzerCore.Services
         private BscScan bscScanApiClient = new BscScan();
         private static List<int> numbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
         private TelegramNotifier telegramNotifier = new TelegramNotifier(chatId: "-532850503");
-        private Web3 web3 = new Web3("https://rpc-mainnet.maticvigil.com");
+        private Web3 web3;
         private string ourAddress;
 
         public IConfigurationRoot configuration;
         public List<string> addresses = new List<string>();
         public Dictionary<string, List<Result>> SharedData = new Dictionary<string, List<Result>>(); 
       
-        public PlyAnalyzerService(Dictionary<string, List<Result>> data)
+        public PlyAnalyzerService(Dictionary<string, List<Result>> data, string uri= "http://162.55.94.149:8545")
         {
             log.Info("AnalyzerService Starting");
             IConfiguration configuration = new ConfigurationBuilder()
@@ -44,6 +44,7 @@ namespace AnalyzerCore.Services
                 .Build();
             Options options = new Options();
 
+            this.web3 = new Web3(uri);
 
             configuration.GetSection(nameof(Options)).Bind(options);
 
@@ -72,7 +73,7 @@ namespace AnalyzerCore.Services
                 log.Info("New Analsys Cycle");
                 var msg = new Message();
                 msg.Addresses = new List<AddressStats>();
-                msg.Timestamp = $"*[{DateTime.Now}]*";
+                msg.Timestamp = $"<b>\U0001F550[{DateTime.Now}]\U0001F550</b>";
 
                 // Get Current Block
                 HexBigInteger currentBlock = null;
@@ -129,10 +130,12 @@ namespace AnalyzerCore.Services
                     log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count()}");
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
-                        log.Info($"Evaluating from block: {currentBlock.Value - numberOfBlocks} to block: {currentBlock.Value}");
+                        log.Info($"NB: {numberOfBlocks} Evaluating SB: {currentBlock.Value - numberOfBlocks} TB: {currentBlock.Value}");
 
                         BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction> succededTrxs = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
-                        foreach (var _t in addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks))
+                        var trxToAnalyze = addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks);
+                        log.Info($"TRX to analyze: {trxToAnalyze.Count()}");
+                        foreach (var _t in trxToAnalyze)
                         {
                             log.Info($"Getting Receipt for trx hash: {_t.TransactionHash}");
 
@@ -150,8 +153,6 @@ namespace AnalyzerCore.Services
                                 log.Error(e.ToString());
                             }
                             
-                            
-                            log.Info(Dump(receipt.Result.TransactionIndex));
                             if (receipt.Result != null)
                             {
                                 if (receipt.Result.Status.Value.IsOne)
@@ -161,7 +162,6 @@ namespace AnalyzerCore.Services
                                 }
                             }
                         }
-
                         try
                         {
                             long successRate = 100 * succededTrxs.Count() / addrTrxs.Take(numberOfBlocks).Count();
@@ -181,13 +181,10 @@ namespace AnalyzerCore.Services
                     msg.Addresses.Add(addrStats);
                 }
 
-                log.Info(Dump(msg));
-                telegramNotifier.SendMessage(JsonSerializer.Serialize(msg, new JsonSerializerOptions { WriteIndented = true }).ToString());
-                
+                telegramNotifier.SendStatsRecap(message: msg);
                 await Task.Delay(taskDelayMs, stoppingToken);
             }
         }
-
 
         private static string Dump(object o)
         {
