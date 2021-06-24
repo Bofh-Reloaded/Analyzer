@@ -168,7 +168,7 @@ namespace AnalyzerCore.Services
                             BlockRangeStats blockRangeStats = new BlockRangeStats();
                             blockRangeStats.BlockRange = numberOfBlocks;
                             blockRangeStats.SuccededTranstactionsPerBlockRange = succededTrxs.Count();
-                            blockRangeStats.TotalTransactionsPerBlockRange = addrTrxs.Take(numberOfBlocks).Count();
+                            blockRangeStats.TotalTransactionsPerBlockRange = trxToAnalyze.Count();
                             blockRangeStats.SuccessRate = $"{successRate}%";
                             addrStats.BlockRanges.Add(blockRangeStats);
                         }
