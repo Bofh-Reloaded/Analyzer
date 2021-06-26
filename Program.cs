@@ -45,14 +45,16 @@ namespace AnalyzerCore
                 var section = configuration.GetSection("PlyEnemies");
                 List<string> addresses = section.Get<List<string>>() ?? new List<string>();
                 addresses.Add(ourAddress);
-                log.Info($"Analyzing addresses: {addresses.ToString()}");
 
                 // Create and add the HostedService for Polygon
                 services.AddHostedService<AnalyzerService>(
                     s => new AnalyzerService(
                         chainName: "Polygon",
                         uri: "http://162.55.94.149:8545",
-                        addresses: addresses)
+                        addresses: addresses,
+                        telegramNotifier: new Notifier.TelegramNotifier(
+                            chatId: "-532850503")
+                        )
                 );
             });
     }

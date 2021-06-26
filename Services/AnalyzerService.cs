@@ -13,6 +13,7 @@ using Nethereum.Hex.HexTypes;
 using System.Numerics;
 using AnalyzerCore.Models;
 using System.Collections.Concurrent;
+using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Services
 {
@@ -51,11 +52,13 @@ namespace AnalyzerCore.Services
         public AnalyzerService(
             string chainName,
             string uri,
-            List<string> addresses)
+            List<string> addresses,
+            TelegramNotifier telegramNotifier)
         {
             // Filling instance variable
             this.chainName = chainName;
             this.addresses = addresses;
+            this.telegramNotifier = telegramNotifier;
 
             // Registering Nethereum Web3 client endpoint
             log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -127,7 +130,29 @@ namespace AnalyzerCore.Services
                     addrStats.Address = address;
                     addrStats.BlockRanges = new List<BlockRangeStats>();
 
-                    var addrTrxs = trx.Where(tr => tr.From.ToLower() == address.ToLower());
+                    //var addrTrxs = trx.Where(tr => tr.From.ToLower() == address.ToLower());
+                    List<Transaction> addrTrxs = new List<Transaction>();
+                    foreach (var tr in trx)
+                    {
+                        // Skip if To field is empty
+                        if (tr.To == null)
+                        {
+                            continue;
+                        }
+
+                        // Check if the address is inside From field
+                        if (tr.From.ToLower() == address.ToLower())
+                        {
+                            addrTrxs.Add(tr);
+                            continue;
+                        }
+
+                        // Otherwise check if the address is inside the To field (meaning that we are working with a contract
+                        if (tr.To.ToLower() == address.ToLower())
+                        {
+                            addrTrxs.Add(tr);
+                        }
+                    }
                     log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count()}");
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
@@ -138,7 +163,7 @@ namespace AnalyzerCore.Services
                         log.Info($"TRX to analyze: {trxToAnalyze.Count()}");
                         foreach (var _t in trxToAnalyze)
                         {
-                            log.Info($"Getting Receipt for trx hash: {_t.TransactionHash}");
+                            log.Debug($"Getting Receipt for trx hash: {_t.TransactionHash}");
 
                             // Initialize receipt variable
                             Task<Nethereum.RPC.Eth.DTOs.TransactionReceipt> receipt = null;
@@ -158,7 +183,7 @@ namespace AnalyzerCore.Services
                             {
                                 if (receipt.Result.Status.Value.IsOne)
                                 {
-                                    log.Info($"Succeeded trx with hash: {_t.TransactionHash}");
+                                    log.Debug($"Succeeded trx with hash: {_t.TransactionHash}");
                                     succededTrxs.Add(_t);
                                 }
                             }
