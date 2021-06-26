@@ -130,29 +130,27 @@ namespace AnalyzerCore.Services
                     addrStats.Address = address;
                     addrStats.BlockRanges = new List<BlockRangeStats>();
 
-                    //var addrTrxs = trx.Where(tr => tr.From.ToLower() == address.ToLower());
-                    List<Transaction> addrTrxs = new List<Transaction>();
-                    foreach (var tr in trx)
+                    BlockingCollection<Transaction> addrTrxs = new BlockingCollection<Transaction>();
+                    Parallel.ForEach(trx, new ParallelOptions { MaxDegreeOfParallelism = 12 }, tr =>
                     {
                         // Skip if To field is empty
-                        if (tr.To == null)
+                        if (tr.To != null && tr.From != null)
                         {
-                            continue;
-                        }
+                            // Check if the address is inside From field
+                            if (tr.From.ToLower() == address.ToLower())
+                            {
+                                addrTrxs.Add(tr);
+                                return;
+                            } 
 
-                        // Check if the address is inside From field
-                        if (tr.From.ToLower() == address.ToLower())
-                        {
-                            addrTrxs.Add(tr);
-                            continue;
+                            // Otherwise check if the address is inside the To field (meaning that we are working with a contract
+                            if (tr.To.ToLower() == address.ToLower())
+                            {
+                                addrTrxs.Add(tr);
+                                return;
+                            }
                         }
-
-                        // Otherwise check if the address is inside the To field (meaning that we are working with a contract
-                        if (tr.To.ToLower() == address.ToLower())
-                        {
-                            addrTrxs.Add(tr);
-                        }
-                    }
+                    });
                     log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count()}");
                     foreach (var numberOfBlocks in numbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
