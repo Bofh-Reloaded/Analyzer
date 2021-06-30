@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Libs\" />
     <Folder Include="Notifier\" />
     <Folder Include="Services\" />
   </ItemGroup>

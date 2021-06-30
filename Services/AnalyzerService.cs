@@ -97,7 +97,7 @@ namespace AnalyzerCore.Services
                 var trx = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
                 Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = 8 }, b =>
                 {
-                    log.Info($"Processing Block: {b}");
+                    log.Debug($"Processing Block: {b}");
 
                     // Initilize null object to be accessible outside try/catch scope
                     Task<Nethereum.RPC.Eth.DTOs.BlockWithTransactions> block = null;
@@ -159,7 +159,7 @@ namespace AnalyzerCore.Services
                         BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction> succededTrxs = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
                         var trxToAnalyze = addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks);
                         log.Info($"TRX to analyze: {trxToAnalyze.Count()}");
-                        foreach (var _t in trxToAnalyze)
+                        Parallel.ForEach(trxToAnalyze, new ParallelOptions { MaxDegreeOfParallelism = 12 }, _t =>
                         {
                             log.Debug($"Getting Receipt for trx hash: {_t.TransactionHash}");
 
@@ -167,7 +167,7 @@ namespace AnalyzerCore.Services
                             Task<Nethereum.RPC.Eth.DTOs.TransactionReceipt> receipt = null;
 
                             // Try to get the transaction receipt
-                            try 
+                            try
                             {
                                 receipt = web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(_t.TransactionHash);
                                 receipt.Wait();
@@ -176,7 +176,7 @@ namespace AnalyzerCore.Services
                             {
                                 log.Error(e.ToString());
                             }
-                            
+
                             if (receipt.Result != null)
                             {
                                 if (receipt.Result.Status.Value.IsOne)
@@ -185,7 +185,7 @@ namespace AnalyzerCore.Services
                                     succededTrxs.Add(_t);
                                 }
                             }
-                        }
+                        });
                         try
                         {
                             // Calculate the success rate and construct che BlockRangeStat object

@@ -7,10 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using AnalyzerCore.Services;
 using System.Collections.Generic;
-using AnalyzerCore.Models.BscScanModels;
 using Microsoft.Extensions.Configuration;
 using System;
-using AnalyzerCore.Models;
 
 namespace AnalyzerCore
 {
@@ -19,7 +17,6 @@ namespace AnalyzerCore
         private static readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
-        public static Dictionary<string, List<Result>> SharedTrxData = new Dictionary<string, List<Result>>();
 
         static void Main(string[] args)
         {
@@ -30,32 +27,62 @@ namespace AnalyzerCore
             CreateHostBuilder(args).Build().Run();
         }
 
+        public class AnalyzerConfig
+        {
+            public string PlyAddress { get; set; }
+            public string BscAddress { get; set; }
+            public List<string> PlyEnemies { get; set; }
+            public List<string> BscEnemies { get; set; }
+        }
+
         public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
             {
-                IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();
-                Options options = new Options();
-                configuration.GetSection(nameof(Options)).Bind(options);
-                var _s = configuration.GetSection("PlyAddress");
-                var ourAddress = _s.Get<string>();
-                var section = configuration.GetSection("PlyEnemies");
-                List<string> addresses = section.Get<List<string>>() ?? new List<string>();
-                addresses.Add(ourAddress);
+            // Define Configuration File Reader
+            IConfiguration configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+            .AddJsonFile("appSettings.json", false, reloadOnChange: true)
+            .Build();
+
+            // Map json configuration inside Object
+            var section = configuration.GetSection(nameof(AnalyzerConfig));
+            var analyzerConfig = section.Get<AnalyzerConfig>();
+
+            // Adding our own address as last one
+            analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
+            analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
+
+                // Create Polygon Service
+                AnalyzerService polygonAnalyzerService = new AnalyzerService(
+                    chainName: "Polygon",
+                    uri: "http://162.55.94.149:8545",
+                    addresses: analyzerConfig.PlyEnemies,
+                    telegramNotifier: new Notifier.TelegramNotifier(
+                        chatId: "-532850503")
+                    );
 
                 // Create and add the HostedService for Polygon
                 services.AddHostedService<AnalyzerService>(
                     s => new AnalyzerService(
                         chainName: "Polygon",
                         uri: "http://162.55.94.149:8545",
-                        addresses: addresses,
+                        addresses: analyzerConfig.PlyEnemies,
                         telegramNotifier: new Notifier.TelegramNotifier(
                             chatId: "-532850503")
                         )
-                );
+                    );
+
+                // Create and add the HostedService for Binance Smart Chain
+                services.AddHostedService<AnalyzerService>(
+                    s => new AnalyzerService(
+                        chainName: "Binance Smart Chain",
+                        uri: "http://135.148.123.21:8545",
+                        addresses: analyzerConfig.BscEnemies,
+                        telegramNotifier: new Notifier.TelegramNotifier(
+                            chatId: "-560874043")
+                        )
+                    );
             });
     }
 }
