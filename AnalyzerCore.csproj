@@ -8,12 +8,34 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
-    <PackageReference Include="JSON.net" Version="1.0.31" />
+    <PackageReference Include="JSON.net" Version="1.0.33" />
     <PackageReference Include="log4net" Version="2.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.13" />
-    <PackageReference Include="Nethereum.Portable" Version="3.7.0" />
+    <PackageReference Include="Nethereum.ABI" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Accounts" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Autogen.ContractApi" Version="3.6.2" />
+    <PackageReference Include="Nethereum.BlockchainProcessing" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Contracts" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Generators" Version="3.6.1" />
+    <PackageReference Include="Nethereum.Geth" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Hex" Version="3.8.0" />
+    <PackageReference Include="Nethereum.JsonRpc.Client" Version="3.8.0" />
+    <PackageReference Include="Nethereum.JsonRpc.IpcClient" Version="3.8.0" />
+    <PackageReference Include="Nethereum.JsonRpc.RpcClient" Version="3.8.0" />
+    <PackageReference Include="Nethereum.JsonRpc.WebSocketClient" Version="3.8.0" />
+    <PackageReference Include="Nethereum.KeyStore" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Model" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Quorum" Version="3.8.0" />
+    <PackageReference Include="Nethereum.RLP" Version="3.8.0" />
+    <PackageReference Include="Nethereum.RPC" Version="3.8.0" />
+    <PackageReference Include="Nethereum.RPC.Reactive" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Signer" Version="3.8.0" />
+    <PackageReference Include="Nethereum.StandardTokenEIP20" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Uport" Version="0.0.20" />
+    <PackageReference Include="Nethereum.Util" Version="3.8.0" />
+    <PackageReference Include="Nethereum.Web3" Version="3.8.0" />
     <PackageReference Include="Telegram.Bot" Version="15.7.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="5.0.0" />
@@ -22,7 +44,6 @@
   <ItemGroup>
     <Folder Include="Libs\" />
     <Folder Include="Notifier\" />
-    <Folder Include="Services\" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="appSettings.json" />

@@ -48,23 +48,18 @@ namespace AnalyzerCore
             // Map json configuration inside Object
             var section = configuration.GetSection(nameof(AnalyzerConfig));
             var analyzerConfig = section.Get<AnalyzerConfig>();
+            services.AddSingleton<IHostedService>(
+                _ => new SubscribedService()
+                );
 
-            // Adding our own address as last one
-            analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
-            analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
-
-                // Create Polygon Service
-                AnalyzerService polygonAnalyzerService = new AnalyzerService(
-                    chainName: "Polygon",
-                    uri: "http://162.55.94.149:8545",
-                    addresses: analyzerConfig.PlyEnemies,
-                    telegramNotifier: new Notifier.TelegramNotifier(
-                        chatId: "-532850503")
-                    );
+                /*
+                // Adding our own address as last one
+                analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
+                analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
 
                 // Create and add the HostedService for Polygon
-                services.AddHostedService<AnalyzerService>(
-                    s => new AnalyzerService(
+                services.AddSingleton<IHostedService>(
+                    _ => new AnalyzerService(
                         chainName: "Polygon",
                         uri: "http://162.55.94.149:8545",
                         addresses: analyzerConfig.PlyEnemies,
@@ -74,8 +69,8 @@ namespace AnalyzerCore
                     );
 
                 // Create and add the HostedService for Binance Smart Chain
-                services.AddHostedService<AnalyzerService>(
-                    s => new AnalyzerService(
+                services.AddSingleton<IHostedService>(
+                    _ => new AnalyzerService(
                         chainName: "Binance Smart Chain",
                         uri: "http://135.148.123.21:8545",
                         addresses: analyzerConfig.BscEnemies,
@@ -83,6 +78,7 @@ namespace AnalyzerCore
                             chatId: "-560874043")
                         )
                     );
+                */
             });
     }
 }

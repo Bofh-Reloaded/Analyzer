@@ -36,9 +36,6 @@ namespace AnalyzerCore.Services
         // Define Web3 (Nethereum) client
         private Web3 web3;
 
-        // Initialize empty string that we will use to fill with our address on this chain, probably will be removed
-        private string ourAddress;
-
         // String Value representing the chain name
         private string chainName;
 
@@ -47,7 +44,6 @@ namespace AnalyzerCore.Services
 
         // Inizialize an empty list of string that will be filled with addresses
         public List<string> addresses = new List<string>();
-        private string uri;
 
         public AnalyzerService(
             string chainName,
