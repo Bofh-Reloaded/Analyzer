@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
                     t.Wait();
                     if (t.Result != null)
                     {
-                        log.Info($"new pending trx from addr: {t.Result.From}");
+                        log.Info($"new pending trx from addr: {t.Result.From}, txhash: {t.Result.TransactionHash}");
                         if (t.Result.From.ToLower() == "0xEc009815B473459cB8da30F6CF9C6e91C286D7Fe".ToLower())
                         {
                             log.Info($"US: {JsonConvert.SerializeObject(t.Result, Formatting.Indented)}");
