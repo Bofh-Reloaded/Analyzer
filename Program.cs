@@ -31,31 +31,33 @@ namespace AnalyzerCore
         {
             public string PlyAddress { get; set; }
             public string BscAddress { get; set; }
+            public string HecoAddress { get; set; }
             public List<string> PlyEnemies { get; set; }
             public List<string> BscEnemies { get; set; }
+            public List<string> HecoEnemies { get; set; }
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
             {
-            // Define Configuration File Reader
-            IConfiguration configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-            .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-            .Build();
+                // Define Configuration File Reader
+                IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
+                .Build();
 
-            // Map json configuration inside Object
-            var section = configuration.GetSection(nameof(AnalyzerConfig));
-            var analyzerConfig = section.Get<AnalyzerConfig>();
-            services.AddSingleton<IHostedService>(
-                _ => new SubscribedService()
-                );
+                // Map json configuration inside Object
+                var section = configuration.GetSection(nameof(AnalyzerConfig));
+                var analyzerConfig = section.Get<AnalyzerConfig>();
+                /*services.AddSingleton<IHostedService>(
+                    _ => new SubscribedService()
+                    );*/
 
-                /*
                 // Adding our own address as last one
                 analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
                 analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
+                analyzerConfig.HecoEnemies.Add(analyzerConfig.HecoAddress);
 
                 // Create and add the HostedService for Polygon
                 services.AddSingleton<IHostedService>(
@@ -76,6 +78,18 @@ namespace AnalyzerCore
                         addresses: analyzerConfig.BscEnemies,
                         telegramNotifier: new Notifier.TelegramNotifier(
                             chatId: "-560874043")
+                        )
+                    );
+
+                // Create and add the HostedService for Heco Chain
+                /*
+                services.AddSingleton<IHostedService>(
+                    _ => new AnalyzerService(
+                        chainName: "Heco Chain",
+                        uri: "",
+                        addresses: analyzerConfig.HecoEnemies,
+                        telegramNotifier: new Notifier.TelegramNotifier(
+                            chatId: "")
                         )
                     );
                 */

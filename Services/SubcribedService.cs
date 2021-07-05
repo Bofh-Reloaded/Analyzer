@@ -88,7 +88,7 @@ namespace AnalyzerCore.Services
 
                 // run for minute
                 // transactions should appear on another thread
-                await Task.Delay(TimeSpan.FromMinutes(1));
+                await Task.Delay(TimeSpan.FromMinutes(10));
 
                 // unsubscribe
                 await subscription.UnsubscribeAsync();

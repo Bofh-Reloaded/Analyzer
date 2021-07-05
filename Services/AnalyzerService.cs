@@ -45,6 +45,14 @@ namespace AnalyzerCore.Services
         // Inizialize an empty list of string that will be filled with addresses
         public List<string> addresses = new List<string>();
 
+        public static class OpCodes
+        {
+            public static string T0 = new string("085ea7b3");
+            public static string T1 = new string("185ea7b3");
+            public static string T2 = new string("285ea7b3");
+            public static string Cont = new string("985ea7b3");
+        }
+
         public AnalyzerService(
             string chainName,
             string uri,
