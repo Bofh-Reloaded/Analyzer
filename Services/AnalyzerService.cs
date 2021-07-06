@@ -35,6 +35,7 @@ namespace AnalyzerCore.Services
 
         public int blockDurationTime { get; private set; }
         public int maxParallelism { get; private set; }
+        public string ourAddress { get; private set; }
 
         // Define Web3 (Nethereum) client
         private Web3 web3;
@@ -56,13 +57,7 @@ namespace AnalyzerCore.Services
             public static string Cont = new string("985ea7b3");
         }
 
-        public AnalyzerService(
-            string chainName,
-            string uri,
-            List<string> addresses,
-            TelegramNotifier telegramNotifier,
-            int blockDurationTime,
-            int maxParallelism)
+        public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier, int blockDurationTime, int maxParallelism, string ourAddress)
         {
             // Filling instance variable
             this.chainName = chainName;
@@ -70,6 +65,8 @@ namespace AnalyzerCore.Services
             this.telegramNotifier = telegramNotifier;
             this.blockDurationTime = blockDurationTime;
             this.maxParallelism = maxParallelism;
+            this.ourAddress = ourAddress;
+            this.addresses.Add(ourAddress);
 
             // Registering Nethereum Web3 client endpoint
             log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -105,33 +102,7 @@ namespace AnalyzerCore.Services
                 );
 
                 // Get all the transactions inside the blocks between latest and latest - 500
-                var trx = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
-                Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, b =>
-                {
-                    log.Debug($"Processing Block: {b}");
-
-                    // Initilize null object to be accessible outside try/catch scope
-                    Task<Nethereum.RPC.Eth.DTOs.BlockWithTransactions> block = null;
-
-                    // Retrieve Transactions inside block X
-                    try
-                    {
-                        block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new HexBigInteger((BigInteger)b));
-                        block.Wait();
-                    } catch (Exception e)
-                    {
-                        log.Error(Dump(e));
-                    }
-                    
-                    if (block != null)
-                    {
-                        foreach (Nethereum.RPC.Eth.DTOs.Transaction e in block.Result.Transactions)
-                        {
-                            // Filling the blocking collection
-                            trx.Add(e);
-                        }
-                    }
-                });
+                BlockingCollection<Transaction> trx = GetBlocksAsync(startBlock: startBlock, currentBlock: currentBlock);
                 log.Info($"Total trx: {trx.Count()}");
 
                 /* Checking succeded transactions */
@@ -206,6 +177,19 @@ namespace AnalyzerCore.Services
                             blockRangeStats.SuccededTranstactionsPerBlockRange = succededTrxs.Count();
                             blockRangeStats.TotalTransactionsPerBlockRange = trxToAnalyze.Count();
                             blockRangeStats.SuccessRate = $"{successRate}%";
+                            if (address.ToLower() == ourAddress.ToLower())
+                            {
+                                // Analyze the stats for type of trade
+                                blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") == true).ToList();
+                                blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}") == true).ToList();
+                                blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}") == true).ToList();
+                                blockRangeStats.ContP = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}") == true).ToList();
+                                blockRangeStats.T0TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") == true).ToList();
+                                blockRangeStats.T1TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}") == true).ToList();
+                                blockRangeStats.T2TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}") == true).ToList();
+                                blockRangeStats.ContPSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}") == true).ToList();
+
+                            }
                             addrStats.BlockRanges.Add(blockRangeStats);
                         }
                         catch (System.DivideByZeroException)
@@ -218,9 +202,46 @@ namespace AnalyzerCore.Services
                 }
                 msg.TotalTrx = trx.Count();
                 msg.TPS = trx.Count() / blockDurationTime;
+
+                msg.ourAddress = ourAddress;
+
                 telegramNotifier.SendStatsRecap(message: msg);
+
                 await Task.Delay(taskDelayMs, stoppingToken);
             }
+        }
+
+        private BlockingCollection<Transaction> GetBlocksAsync(HexBigInteger startBlock, HexBigInteger currentBlock)
+        {
+            BlockingCollection<Transaction>  trx = new BlockingCollection<Transaction>();
+            Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, b =>
+            {
+                log.Debug($"Processing Block: {b}");
+
+                // Initilize null object to be accessible outside try/catch scope
+                Task<Nethereum.RPC.Eth.DTOs.BlockWithTransactions> block = null;
+
+                // Retrieve Transactions inside block X
+                try
+                {
+                    block = web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new HexBigInteger((BigInteger)b));
+                    block.Wait();
+                }
+                catch (Exception e)
+                {
+                    log.Error(Dump(e));
+                }
+
+                if (block != null)
+                {
+                    foreach (Transaction e in block.Result.Transactions)
+                    {
+                        // Filling the blocking collection
+                        trx.Add(e);
+                    }
+                }
+            });
+            return trx;
         }
 
         private static string Dump(object o)

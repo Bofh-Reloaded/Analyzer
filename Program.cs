@@ -71,7 +71,6 @@ namespace AnalyzerCore
 
                 if (servicesConfig.PlyEnabled)
                 {
-                    analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
                     // Create and add the HostedService for Polygon
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
@@ -81,14 +80,14 @@ namespace AnalyzerCore
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-532850503"),
                             blockDurationTime: 3,
-                            maxParallelism: servicesConfig.MaxParallelism
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.PlyAddress
                             )
                         );
                 }
                 
                 if (servicesConfig.BscEnabled)
                 {
-                    analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
                     // Create and add the HostedService for Binance Smart Chain
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
@@ -98,21 +97,14 @@ namespace AnalyzerCore
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-560874043"),
                             blockDurationTime: 5,
-                            maxParallelism: servicesConfig.MaxParallelism
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.BscAddress
                             )
                         );
                 }
 
                 if (servicesConfig.HecoEnabled)
                 {
-                    try
-                    {
-                        analyzerConfig.HecoEnemies.Add(analyzerConfig.HecoAddress);
-                    } catch (NullReferenceException)
-                    {
-                        analyzerConfig.HecoEnemies = new List<string>() { analyzerConfig.HecoAddress };
-                    }
-                    
                     // Create and add the HostedService for Heco Chain
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
@@ -122,7 +114,8 @@ namespace AnalyzerCore
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-516536036"),
                             blockDurationTime: 3,
-                            maxParallelism: servicesConfig.MaxParallelism
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.HecoAddress
                             )
                         );
                 }

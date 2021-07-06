@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Nethereum.RPC.Eth.DTOs;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -23,6 +24,14 @@ namespace AnalyzerCore.Models
         public int SuccededTranstactionsPerBlockRange { get; set; }
         public int TotalTransactionsPerBlockRange { get; set; }
         public string SuccessRate { get; set; }
+        public List<Transaction> T0Trx { get; internal set; }
+        public List<Transaction> T1Trx { get; internal set; }
+        public List<Transaction> T2Trx { get; internal set; }
+        public List<Transaction> ContP { get; internal set; }
+        public List<Transaction> T0TrxSucceded { get; internal set; }
+        public List<Transaction> T1TrxSucceded { get; internal set; }
+        public List<Transaction> T2TrxSucceded { get; internal set; }
+        public List<Transaction> ContPSucceded { get; internal set; }
     }
     public class AddressStats
     {
@@ -36,5 +45,6 @@ namespace AnalyzerCore.Models
         public List<AddressStats> Addresses { get; set; }
         public int TPS { get; set; }
         public int TotalTrx { get; internal set; }
+        public string ourAddress { get; internal set; }
     }
 }
