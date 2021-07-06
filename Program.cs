@@ -43,6 +43,7 @@ namespace AnalyzerCore
             public bool PlyEnabled { get; set; }
             public bool HecoEnabled { get; set; }
             public bool PlyPendingEnabled { get; set; }
+            public int MaxParallelism { get; set; }
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -79,7 +80,8 @@ namespace AnalyzerCore
                             addresses: analyzerConfig.PlyEnemies,
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-532850503"),
-                            blockDurationTime: 3
+                            blockDurationTime: 3,
+                            maxParallelism: servicesConfig.MaxParallelism
                             )
                         );
                 }
@@ -90,12 +92,13 @@ namespace AnalyzerCore
                     // Create and add the HostedService for Binance Smart Chain
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
-                            chainName: "Binance Smart Chain",
+                            chainName: "BinanceSmartChain",
                             uri: "http://135.148.123.21:8545",
                             addresses: analyzerConfig.BscEnemies,
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-560874043"),
-                            blockDurationTime: 5
+                            blockDurationTime: 5,
+                            maxParallelism: servicesConfig.MaxParallelism
                             )
                         );
                 }
@@ -113,12 +116,13 @@ namespace AnalyzerCore
                     // Create and add the HostedService for Heco Chain
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
-                            chainName: "Heco Chain",
+                            chainName: "HecoChain",
                             uri: "http://140.82.61.75:8545",
                             addresses: analyzerConfig.HecoEnemies,
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-516536036"),
-                            blockDurationTime: 3
+                            blockDurationTime: 3,
+                            maxParallelism: servicesConfig.MaxParallelism
                             )
                         );
                 }

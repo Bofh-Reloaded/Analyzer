@@ -34,6 +34,7 @@ namespace AnalyzerCore.Services
         private TelegramNotifier telegramNotifier;
 
         public int blockDurationTime { get; private set; }
+        public int maxParallelism { get; private set; }
 
         // Define Web3 (Nethereum) client
         private Web3 web3;
@@ -60,13 +61,15 @@ namespace AnalyzerCore.Services
             string uri,
             List<string> addresses,
             TelegramNotifier telegramNotifier,
-            int blockDurationTime)
+            int blockDurationTime,
+            int maxParallelism)
         {
             // Filling instance variable
             this.chainName = chainName;
             this.addresses = addresses;
             this.telegramNotifier = telegramNotifier;
             this.blockDurationTime = blockDurationTime;
+            this.maxParallelism = maxParallelism;
 
             // Registering Nethereum Web3 client endpoint
             log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -103,7 +106,7 @@ namespace AnalyzerCore.Services
 
                 // Get all the transactions inside the blocks between latest and latest - 500
                 var trx = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
-                Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = 8 }, b =>
+                Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, b =>
                 {
                     log.Debug($"Processing Block: {b}");
 
@@ -139,7 +142,7 @@ namespace AnalyzerCore.Services
                     addrStats.BlockRanges = new List<BlockRangeStats>();
 
                     BlockingCollection<Transaction> addrTrxs = new BlockingCollection<Transaction>();
-                    Parallel.ForEach(trx, new ParallelOptions { MaxDegreeOfParallelism = 12 }, tr =>
+                    Parallel.ForEach(trx, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, tr =>
                     {
                         // Skip if To field is empty
                         if (tr.To != null && tr.From != null)
@@ -167,7 +170,7 @@ namespace AnalyzerCore.Services
                         BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction> succededTrxs = new BlockingCollection<Nethereum.RPC.Eth.DTOs.Transaction>();
                         var trxToAnalyze = addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks);
                         log.Info($"TRX to analyze: {trxToAnalyze.Count()}");
-                        Parallel.ForEach(trxToAnalyze, new ParallelOptions { MaxDegreeOfParallelism = 12 }, _t =>
+                        Parallel.ForEach(trxToAnalyze, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, _t =>
                         {
                             log.Debug($"Getting Receipt for trx hash: {_t.TransactionHash}");
 
