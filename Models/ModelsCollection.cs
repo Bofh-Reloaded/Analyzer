@@ -34,5 +34,7 @@ namespace AnalyzerCore.Models
     {
         public string Timestamp { get; set; }
         public List<AddressStats> Addresses { get; set; }
+        public int TPS { get; set; }
+        public int TotalTrx { get; internal set; }
     }
 }

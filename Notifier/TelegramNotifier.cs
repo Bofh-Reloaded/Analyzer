@@ -10,6 +10,7 @@ using AnalyzerCore.Models;
 using System.Text.Json;
 using System.Collections.Generic;
 using Message = AnalyzerCore.Models.Message;
+using System.Linq;
 
 namespace AnalyzerCore.Notifier
 {
@@ -53,6 +54,7 @@ namespace AnalyzerCore.Notifier
                     _m.Add($" B: {_s.BlockRange} T: {_s.TotalTransactionsPerBlockRange} S: {_s.SuccededTranstactionsPerBlockRange} WR: {_s.SuccessRate}");
                 }
             }
+            _m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.TPS}\U0001F4CA");
             Telegram.Bot.Types.Message result = await _Bot.SendTextMessageAsync(
                 chatId: this._chatId,
                 text: string.Join(Environment.NewLine, _m.ToArray()),

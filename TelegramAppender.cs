@@ -32,7 +32,6 @@ namespace AnalyzerCore
             {
                 throw new ConfigurationErrorsException("Please set the ChatId under TelegramAppender configuration section: <ChatId>...</ChatId>");
             }
-
             if (Bot == null) Bot = new TelegramBotClient(Token);
             var message = Layout == null ? e.RenderedMessage : RenderLoggingEvent(e);
             _tasks.Add(Bot.SendTextMessageAsync(ChatId, message, ParseMode));

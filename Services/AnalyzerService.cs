@@ -33,6 +33,8 @@ namespace AnalyzerCore.Services
         // Define the TelegramNotifier Instance
         private TelegramNotifier telegramNotifier;
 
+        public int blockDurationTime { get; private set; }
+
         // Define Web3 (Nethereum) client
         private Web3 web3;
 
@@ -57,12 +59,14 @@ namespace AnalyzerCore.Services
             string chainName,
             string uri,
             List<string> addresses,
-            TelegramNotifier telegramNotifier)
+            TelegramNotifier telegramNotifier,
+            int blockDurationTime)
         {
             // Filling instance variable
             this.chainName = chainName;
             this.addresses = addresses;
             this.telegramNotifier = telegramNotifier;
+            this.blockDurationTime = blockDurationTime;
 
             // Registering Nethereum Web3 client endpoint
             log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -87,10 +91,10 @@ namespace AnalyzerCore.Services
                 HexBigInteger currentBlock = null;
                 try {
                     currentBlock = await web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
-                } catch (Exception e)
+                } catch (Nethereum.JsonRpc.Client.RpcClientTimeoutException)
                 {
-                    log.Error(e.ToString());
-                    continue;
+                    log.Error($"Cannot connect to RPC for chain: {chainName}");
+                    await Task.Delay(10000, stoppingToken);
                 }
                     
                 HexBigInteger startBlock = new HexBigInteger(
@@ -209,7 +213,8 @@ namespace AnalyzerCore.Services
                     }
                     msg.Addresses.Add(addrStats);
                 }
-
+                msg.TotalTrx = trx.Count();
+                msg.TPS = trx.Count() / blockDurationTime;
                 telegramNotifier.SendStatsRecap(message: msg);
                 await Task.Delay(taskDelayMs, stoppingToken);
             }

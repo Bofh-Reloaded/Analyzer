@@ -37,6 +37,14 @@ namespace AnalyzerCore
             public List<string> HecoEnemies { get; set; }
         }
 
+        public class ServicesConfig
+        {
+            public bool BscEnabled { get; set; }
+            public bool PlyEnabled { get; set; }
+            public bool HecoEnabled { get; set; }
+            public bool PlyPendingEnabled { get; set; }
+        }
+
         public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
@@ -50,49 +58,70 @@ namespace AnalyzerCore
                 // Map json configuration inside Object
                 var section = configuration.GetSection(nameof(AnalyzerConfig));
                 var analyzerConfig = section.Get<AnalyzerConfig>();
-                /*services.AddSingleton<IHostedService>(
-                    _ => new SubscribedService()
-                    );*/
+                var servicesSection = configuration.GetSection("ServicesConfig");
+                var servicesConfig = servicesSection.Get<ServicesConfig>();
 
-                // Adding our own address as last one
-                analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
-                analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
-                analyzerConfig.HecoEnemies.Add(analyzerConfig.HecoAddress);
+                if (servicesConfig.PlyPendingEnabled)
+                {
+                    services.AddSingleton<IHostedService>(
+                        _ => new SubscribedService()
+                        );
+                }
 
-                // Create and add the HostedService for Polygon
-                services.AddSingleton<IHostedService>(
-                    _ => new AnalyzerService(
-                        chainName: "Polygon",
-                        uri: "http://162.55.94.149:8545",
-                        addresses: analyzerConfig.PlyEnemies,
-                        telegramNotifier: new Notifier.TelegramNotifier(
-                            chatId: "-532850503")
-                        )
-                    );
+                if (servicesConfig.PlyEnabled)
+                {
+                    analyzerConfig.PlyEnemies.Add(analyzerConfig.PlyAddress);
+                    // Create and add the HostedService for Polygon
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "Polygon",
+                            uri: "http://162.55.94.149:8545",
+                            addresses: analyzerConfig.PlyEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-532850503"),
+                            blockDurationTime: 3
+                            )
+                        );
+                }
+                
+                if (servicesConfig.BscEnabled)
+                {
+                    analyzerConfig.BscEnemies.Add(analyzerConfig.BscAddress);
+                    // Create and add the HostedService for Binance Smart Chain
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "Binance Smart Chain",
+                            uri: "http://135.148.123.21:8545",
+                            addresses: analyzerConfig.BscEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-560874043"),
+                            blockDurationTime: 5
+                            )
+                        );
+                }
 
-                // Create and add the HostedService for Binance Smart Chain
-                services.AddSingleton<IHostedService>(
-                    _ => new AnalyzerService(
-                        chainName: "Binance Smart Chain",
-                        uri: "http://135.148.123.21:8545",
-                        addresses: analyzerConfig.BscEnemies,
-                        telegramNotifier: new Notifier.TelegramNotifier(
-                            chatId: "-560874043")
-                        )
-                    );
-
-                // Create and add the HostedService for Heco Chain
-                /*
-                services.AddSingleton<IHostedService>(
-                    _ => new AnalyzerService(
-                        chainName: "Heco Chain",
-                        uri: "",
-                        addresses: analyzerConfig.HecoEnemies,
-                        telegramNotifier: new Notifier.TelegramNotifier(
-                            chatId: "")
-                        )
-                    );
-                */
+                if (servicesConfig.HecoEnabled)
+                {
+                    try
+                    {
+                        analyzerConfig.HecoEnemies.Add(analyzerConfig.HecoAddress);
+                    } catch (NullReferenceException)
+                    {
+                        analyzerConfig.HecoEnemies = new List<string>() { analyzerConfig.HecoAddress };
+                    }
+                    
+                    // Create and add the HostedService for Heco Chain
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "Heco Chain",
+                            uri: "http://140.82.61.75:8545",
+                            addresses: analyzerConfig.HecoEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-516536036"),
+                            blockDurationTime: 3
+                            )
+                        );
+                }
             });
     }
 }
