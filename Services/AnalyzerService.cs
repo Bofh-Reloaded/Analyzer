@@ -17,6 +17,13 @@ using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Services
 {
+
+    public class Options
+    {
+        public List<string> addresses { get; set; }
+        public string ourAddress { get; set; }
+    }
+
     public class AnalyzerService : BackgroundService
     {
         // Initialize Logger
@@ -83,6 +90,7 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 log.Info("New Analsys Cycle");
+
                 var msg = new Message();
                 msg.Addresses = new List<AddressStats>();
                 msg.Timestamp = $"<b>\U0001F550[{DateTime.Now}]\U0001F550</b>";
@@ -108,6 +116,7 @@ namespace AnalyzerCore.Services
                 /* Checking succeded transactions */
                 foreach (var address in addresses)
                 {
+
                     var addrStats = new AddressStats();
                     addrStats.Address = address;
                     addrStats.BlockRanges = new List<BlockRangeStats>();
@@ -198,7 +207,7 @@ namespace AnalyzerCore.Services
                             continue;
                         }
                     }
-                    msg.Addresses.Add(addrStats);
+
                 }
                 msg.TotalTrx = trx.Count();
                 msg.TPS = trx.Count() / blockDurationTime;
@@ -206,6 +215,7 @@ namespace AnalyzerCore.Services
                 msg.ourAddress = ourAddress;
 
                 telegramNotifier.SendStatsRecap(message: msg);
+
 
                 await Task.Delay(taskDelayMs, stoppingToken);
             }
