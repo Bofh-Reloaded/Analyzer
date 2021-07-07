@@ -7,20 +7,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using AnalyzerCore.Services;
 using System.Collections.Generic;
-using AnalyzerCore.Models.BscScanModels;
-using Nethereum.Web3;
-
-// TODO: implementare comando via bot per richiamare analisi all'interno di un block range
+using Microsoft.Extensions.Configuration;
+using System;
 
 namespace AnalyzerCore
 {
     class Program
     {
-        // Test
         private static readonly ILog log = LogManager.GetLogger(
             MethodBase.GetCurrentMethod().DeclaringType
             );
-        public static Dictionary<string, List<Result>> SharedTrxData = new Dictionary<string, List<Result>>();
 
         static void Main(string[] args)
         {
@@ -31,13 +27,98 @@ namespace AnalyzerCore
             CreateHostBuilder(args).Build().Run();
         }
 
+        public class AnalyzerConfig
+        {
+            public string PlyAddress { get; set; }
+            public string BscAddress { get; set; }
+            public string HecoAddress { get; set; }
+            public List<string> PlyEnemies { get; set; }
+            public List<string> BscEnemies { get; set; }
+            public List<string> HecoEnemies { get; set; }
+        }
+
+        public class ServicesConfig
+        {
+            public bool BscEnabled { get; set; }
+            public bool PlyEnabled { get; set; }
+            public bool HecoEnabled { get; set; }
+            public bool PlyPendingEnabled { get; set; }
+            public int MaxParallelism { get; set; }
+        }
+
         public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
             {
-                services.AddHostedService<AnalyzerService>(s => new AnalyzerService(SharedTrxData));
-                //services.AddHostedService<FailedTrxService>(s => new FailedTrxService(SharedTrxData));
-                services.AddHostedService<GasAnalyzerService>(s => new GasAnalyzerService(SharedTrxData));
+                // Define Configuration File Reader
+                IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
+                .Build();
+
+                // Map json configuration inside Object
+                var section = configuration.GetSection(nameof(AnalyzerConfig));
+                var analyzerConfig = section.Get<AnalyzerConfig>();
+                var servicesSection = configuration.GetSection("ServicesConfig");
+                var servicesConfig = servicesSection.Get<ServicesConfig>();
+
+                if (servicesConfig.PlyPendingEnabled)
+                {
+                    services.AddSingleton<IHostedService>(
+                        _ => new SubscribedService()
+                        );
+                }
+
+                if (servicesConfig.PlyEnabled)
+                {
+                    // Create and add the HostedService for Polygon
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "Polygon",
+                            uri: "http://162.55.94.149:8545",
+                            addresses: analyzerConfig.PlyEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-532850503"),
+                            blockDurationTime: 3,
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.PlyAddress
+                            )
+                        );
+                }
+                
+                if (servicesConfig.BscEnabled)
+                {
+                    // Create and add the HostedService for Binance Smart Chain
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "BinanceSmartChain",
+                            uri: "http://135.148.123.21:8545",
+                            addresses: analyzerConfig.BscEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-560874043"),
+                            blockDurationTime: 5,
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.BscAddress
+                            )
+                        );
+                }
+
+                if (servicesConfig.HecoEnabled)
+                {
+                    // Create and add the HostedService for Heco Chain
+                    services.AddSingleton<IHostedService>(
+                        _ => new AnalyzerService(
+                            chainName: "HecoChain",
+                            uri: "http://140.82.61.75:8545",
+                            addresses: analyzerConfig.HecoEnemies,
+                            telegramNotifier: new Notifier.TelegramNotifier(
+                                chatId: "-516536036"),
+                            blockDurationTime: 3,
+                            maxParallelism: servicesConfig.MaxParallelism,
+                            ourAddress: analyzerConfig.HecoAddress
+                            )
+                        );
+                }
             });
     }
 }
