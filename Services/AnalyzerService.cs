@@ -99,6 +99,7 @@ namespace AnalyzerCore.Services
                 HexBigInteger currentBlock = null;
                 try {
                     currentBlock = await web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+                    log.Info(currentBlock.Value);
                 } catch (Nethereum.JsonRpc.Client.RpcClientTimeoutException)
                 {
                     log.Error($"Cannot connect to RPC for chain: {chainName}");
@@ -207,7 +208,7 @@ namespace AnalyzerCore.Services
                             continue;
                         }
                     }
-
+                    msg.Addresses.Add(addrStats);
                 }
                 msg.TotalTrx = trx.Count();
                 msg.TPS = trx.Count() / blockDurationTime;

@@ -92,7 +92,7 @@ namespace AnalyzerCore
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
                             chainName: "BinanceSmartChain",
-                            uri: "http://135.148.123.21:8545",
+                            uri: "http://144.76.94.124:8545",
                             addresses: analyzerConfig.BscEnemies,
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-560874043"),
