@@ -109,7 +109,7 @@ namespace AnalyzerCore
                     services.AddSingleton<IHostedService>(
                         _ => new AnalyzerService(
                             chainName: "HecoChain",
-                            uri: "http://140.82.61.75:8545",
+                            uri: "http://162.55.99.62:8545",
                             addresses: analyzerConfig.HecoEnemies,
                             telegramNotifier: new Notifier.TelegramNotifier(
                                 chatId: "-516536036"),
