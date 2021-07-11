@@ -45,9 +45,11 @@
     <Folder Include="Notifier\" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="appSettings.json" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="appSettings.json" />
+    <None Update="appSettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="tokens.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

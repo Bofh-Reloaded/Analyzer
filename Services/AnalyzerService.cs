@@ -14,6 +14,7 @@ using System.Numerics;
 using AnalyzerCore.Models;
 using System.Collections.Concurrent;
 using Nethereum.RPC.Eth.DTOs;
+using System.IO;
 
 namespace AnalyzerCore.Services
 {
@@ -74,6 +75,13 @@ namespace AnalyzerCore.Services
             this.maxParallelism = maxParallelism;
             this.ourAddress = ourAddress;
             this.addresses.Add(ourAddress);
+
+            // Load configuration regarding tokens
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("tokens.json", false, reloadOnChange: true)
+                .Build();
+            var section = configuration.Get<TokenListConfig>();
 
             // Registering Nethereum Web3 client endpoint
             log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -171,10 +179,15 @@ namespace AnalyzerCore.Services
 
                             if (receipt.Result != null)
                             {
-                                if (receipt.Result.Status.Value.IsOne)
+                                if (receipt.Result.Status.Value.IsOne && receipt.Result.Logs.Count > 0)
                                 {
                                     log.Debug($"Succeeded trx with hash: {_t.TransactionHash}");
                                     succededTrxs.Add(_t);
+                                    // Analyze Tokens
+                                    if (address.ToLower() == "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178".ToLower())
+                                    {
+                                        log.Info("Boh.");
+                                    }
                                 }
                             }
                         });
@@ -210,13 +223,13 @@ namespace AnalyzerCore.Services
                     }
                     msg.Addresses.Add(addrStats);
                 }
+
                 msg.TotalTrx = trx.Count();
                 msg.TPS = trx.Count() / blockDurationTime;
 
                 msg.ourAddress = ourAddress;
 
                 telegramNotifier.SendStatsRecap(message: msg);
-
 
                 await Task.Delay(taskDelayMs, stoppingToken);
             }
