@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
+﻿using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models.GethModels
@@ -43,16 +41,12 @@ namespace AnalyzerCore.Models.GethModels
 
     public class TransactionReceiptJsonRequest
     {
-        [JsonProperty("jsonrpc")]
-        public string Jsonrpc { get; set; }
+        [JsonProperty("jsonrpc")] public string Jsonrpc { get; set; }
 
-        [JsonProperty("method")]
-        public string Method { get; set; }
+        [JsonProperty("method")] public string Method { get; set; }
 
-        [JsonProperty("params")]
-        public List<string> Params { get; set; }
+        [JsonProperty("params")] public List<string> Params { get; set; }
 
-        [JsonProperty("id")]
-        public long Id { get; set; }
+        [JsonProperty("id")] public long Id { get; set; }
     }
 }

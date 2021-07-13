@@ -17,32 +17,29 @@ namespace AnalyzerCore.Services
 {
     public class TransactionObservable : IObservable<Transaction>
     {
-        private List<IObserver<Transaction>> observers;
+        private readonly List<IObserver<Transaction>> _observers;
 
         public TransactionObservable()
         {
-            observers = new List<IObserver<Transaction>>();
+            _observers = new List<IObserver<Transaction>>();
         }
 
         public IDisposable Subscribe(IObserver<Transaction> observer)
         {
-            if (! observers.Contains(observer))
-            {
-                observers.Add(observer);
-            }
-            return new Unsubscriber(observers, observer);
+            if (!_observers.Contains(observer)) _observers.Add(observer);
+            return new Unsubscriber(_observers, observer);
         }
 
         private class Unsubscriber : IDisposable
         {
-            private List<IObserver<Transaction>> _observers;
-            private IObserver<Transaction> _observer;
+            private readonly IObserver<Transaction> _observer;
+            private readonly List<IObserver<Transaction>> _observers;
 
             public Unsubscriber(List<IObserver<Transaction>> observers,
-                 IObserver<Transaction> observer)
+                IObserver<Transaction> observer)
             {
-                this._observers = observers;
-                this._observer = observer;
+                _observers = observers;
+                _observer = observer;
             }
 
             public void Dispose()
@@ -55,17 +52,17 @@ namespace AnalyzerCore.Services
 
     public class MissingTokenJob : BackgroundService
     {
-        private readonly ILog log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod().DeclaringType
-            );
+        private readonly ILog _log = LogManager.GetLogger(
+            MethodBase.GetCurrentMethod()?.DeclaringType
+        );
 
         public MissingTokenJob()
         {
-            log.Info("Starting MissingTokenJob Service");
+            _log.Info("Starting MissingTokenJob Service");
             // Load configuration regarding tokens
             IConfiguration configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("tokens.json", false, reloadOnChange: true)
+                .AddJsonFile("tokens.json", false, true)
                 .Build();
 
             var section = configuration.Get<TokenListConfig>();
@@ -73,10 +70,7 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                await Task.Delay(10000, stoppingToken);
-            }
+            while (!stoppingToken.IsCancellationRequested) await Task.Delay(10000, stoppingToken);
         }
     }
 }

@@ -1,9 +1,4 @@
-﻿using System;
-using Telegram.Bot;
-using Telegram.Bot.Types;
-
-
-namespace AnalyzerCore.Notifier
+﻿namespace AnalyzerCore.Notifier
 {
     public interface ITelegramNotifier
     {

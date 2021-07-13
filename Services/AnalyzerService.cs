@@ -1,26 +1,24 @@
 ﻿using System;
-using log4net;
-using System.Reflection;
-using System.Threading.Tasks;
-using System.Threading;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Linq;
-using Microsoft.Extensions.Configuration;
-using AnalyzerCore.Notifier;
-using Nethereum.Web3;
-using Nethereum.Hex.HexTypes;
-using System.Numerics;
-using AnalyzerCore.Models;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
-using Nethereum.RPC.Eth.DTOs;
 using System.IO;
-using Newtonsoft.Json.Linq;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using AnalyzerCore.Models;
+using AnalyzerCore.Notifier;
+using log4net;
+using Microsoft.Extensions.Configuration;
+using Nethereum.Hex.HexTypes;
+using Nethereum.JsonRpc.Client;
+using Nethereum.RPC.Eth.DTOs;
+using Nethereum.Web3;
 
 namespace AnalyzerCore.Services
 {
-
     public class Options
     {
         public List<string> addresses { get; set; }
@@ -29,46 +27,40 @@ namespace AnalyzerCore.Services
 
     public class AnalyzerService : BackgroundService
     {
-        // Initialize Logger
-        private readonly ILog _log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod()?.DeclaringType
-            );
-
-        // Define the delay between one cycle and another
-        private readonly int _taskDelayMs = 360000;
+        private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
+        private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         // Array of block to analyze
-        private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int> { 25, 100, 500 };
-
-        // Define the TelegramNotifier Instance
-        private readonly TelegramNotifier _telegramNotifier;
-
-        private int blockDurationTime { get; set; }
-        private int maxParallelism { get; set; }
-        private string ourAddress { get; set; }
-
-        // Define Web3 (Nethereum) client
-        private readonly Web3 _web3;
-
-        // String Value representing the chain name
-        private readonly string _chainName;
-
-        // Initiliaze configuration accessor
-        public IConfigurationRoot Configuration;
+        private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int> {25, 100, 500};
 
         // Inizialize an empty list of string that will be filled with addresses
         private readonly List<string> _addresses;
 
-        private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
-        private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
+        // String Value representing the chain name
+        private readonly string _chainName;
 
-        private static class OpCodes
-        {
-            public static readonly string T0 = new string("085ea7b3");
-            public static readonly string T1 = new string("185ea7b3");
-            public static readonly string T2 = new string("285ea7b3");
-            public static readonly string Cont = new string("985ea7b3");
-        }
+        // Initialize Logger
+        private readonly ILog _log = LogManager.GetLogger(
+            MethodBase.GetCurrentMethod()?.DeclaringType
+        );
+
+        // Define the delay between one cycle and another
+        private const int TaskDelayMs = 360000;
+
+        // Define the TelegramNotifier Instance
+        private readonly TelegramNotifier _telegramNotifier;
+
+        // Define Web3 (Nethereum) client
+        private readonly Web3 _web3;
+
+        // Initiliaze configuration accessor
+        public IConfigurationRoot Configuration;
+
+        private readonly int _blockDurationTime;
+        
+        private readonly int _maxParallelism;
+        
+        private readonly string _ourAddress;
 
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
             int blockDurationTime, int maxParallelism, string ourAddress)
@@ -76,24 +68,95 @@ namespace AnalyzerCore.Services
             if (blockDurationTime <= 0) throw new ArgumentOutOfRangeException(nameof(blockDurationTime));
             if (maxParallelism <= 0) throw new ArgumentOutOfRangeException(nameof(maxParallelism));
             // Filling instance variable
-            this._chainName = chainName ?? throw new ArgumentNullException(nameof(chainName));
-            this._addresses = addresses ?? throw new ArgumentNullException(nameof(addresses));
-            this._telegramNotifier = telegramNotifier ?? throw new ArgumentNullException(nameof(telegramNotifier));
-            this.blockDurationTime = blockDurationTime;
-            this.maxParallelism = maxParallelism;
-            this.ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
-            this._addresses.Add(ourAddress);
+            _chainName = chainName ?? throw new ArgumentNullException(nameof(chainName));
+            _addresses = addresses ?? throw new ArgumentNullException(nameof(addresses));
+            _telegramNotifier = telegramNotifier ?? throw new ArgumentNullException(nameof(telegramNotifier));
+            _blockDurationTime = blockDurationTime;
+            _maxParallelism = maxParallelism;
+            _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
+            _addresses.Add(ourAddress);
 
             // Load configuration regarding tokens
             IConfiguration configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("tokens.json", false, reloadOnChange: true)
+                .AddJsonFile("tokens.json", false, true)
                 .Build();
             var section = configuration.Get<TokenListConfig>();
 
             // Registering Nethereum Web3 client endpoint
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");
             _web3 = new Web3(uri);
+        }
+
+
+        private async Task<HexBigInteger> GetCurrentBlock()
+        {
+            try
+            {
+                return await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            }
+            catch (RpcClientTimeoutException)
+            {
+                _log.Error($"Cannot connect to RPC for chain: {_chainName}");
+                throw;
+            }
+        }
+
+        private List<Transaction> GetSuccessfulTransactionsForAddress(
+            IEnumerable<Transaction> trxToAnalyze,
+            string currentAddress,
+            CancellationToken stoppingToken)
+        {
+            var succededTrxs = new BlockingCollection<Transaction>();
+            Parallel.ForEach(trxToAnalyze, new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism},
+                t =>
+                {
+                    _log.Debug($"Getting Receipt for trx hash: {t.TransactionHash}");
+
+                    // Initialize receipt variable
+                    Task<TransactionReceipt> receipt = null;
+
+                    // Try to get the transaction receipt
+                    try
+                    {
+                        receipt =
+                            _web3.Eth.Transactions.GetTransactionReceipt
+                                .SendRequestAsync(t.TransactionHash);
+                        receipt.Wait(stoppingToken);
+                    }
+                    catch (Exception e)
+                    {
+                        _log.Error(e.ToString());
+                    }
+
+                    if (!(receipt is {Result: { }})) return;
+                    if (!receipt.Result.Status.Value.IsOne || receipt.Result.Logs.Count <= 0) return;
+                    _log.Debug($"Succeeded trx with hash: {t.TransactionHash}");
+                    succededTrxs.Add(t, stoppingToken);
+                });
+            return succededTrxs.ToList();
+        }
+
+        private void AnalyzeMissingTokens(string currentAddress, Task<TransactionReceipt> receipt)
+        {
+            // Analyze Tokens
+            if (!string.Equals(currentAddress, TokenAddressToCompareWith,
+                StringComparison.CurrentCultureIgnoreCase)) return;
+            {
+                var logsList = receipt.Result.Logs.ToList();
+                var syncEvents = logsList.Where(
+                    e => string.Equals(e["topics"][0.ToString()].ToString().ToLower(),
+                        SyncEventAddress, StringComparison.Ordinal)
+                ).ToList();
+                foreach (var contract in syncEvents)
+                {
+                    var contractAddress = contract["address"].ToString();
+                    var contractDetail =
+                        _web3.Eth.GetContract("", contractAddress);
+                }
+
+                _log.Info(Dump(syncEvents));
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -107,190 +170,150 @@ namespace AnalyzerCore.Services
             {
                 _log.Info("New Analsys Cycle");
 
-                var msg = new Message();
-                msg.Addresses = new List<AddressStats>();
-                msg.Timestamp = $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550</b>";
+                var msg = new Message
+                {
+                    Addresses = new List<AddressStats>(),
+                    Timestamp =
+                        $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550</b>"
+                };
 
                 // Get Current Block
-                HexBigInteger currentBlock = null;
-                try {
-                    currentBlock = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
-                    _log.Info(currentBlock.Value.ToString());
-                } catch (Nethereum.JsonRpc.Client.RpcClientTimeoutException)
+                var currentBlock = await GetCurrentBlock();
+
+                if (currentBlock is null)
                 {
-                    _log.Error($"Cannot connect to RPC for chain: {_chainName}");
-                    await Task.Delay(10000, stoppingToken);
+                    _log.Error($"Cannot retrieve currentBlock, stopping service: {_chainName}");
+                    break;
                 }
 
-                if (currentBlock is { })
+                var startBlock = new HexBigInteger(currentBlock.Value - NumbersOfBlocksToAnalyze.Max());
+
+                // Get all the transactions inside the blocks between latest and latest - 500
+                var trx = GetBlocksAsync(startBlock, currentBlock);
+                _log.Info($"Total trx: {trx.Count.ToString()}");
+
+                /* Checking succeded transactions */
+                foreach (var address in _addresses)
                 {
-                    HexBigInteger startBlock = new HexBigInteger(
-                        (BigInteger)currentBlock.Value - (BigInteger)NumbersOfBlocksToAnalyze.Max()
-                    );
+                    var addrStats = new AddressStats {Address = address, BlockRanges = new List<BlockRangeStats>()};
+                    var addrTrxs = trx.Where(t => t.IsFrom(address) || t.IsTo(address)).ToList();
 
-                    // Get all the transactions inside the blocks between latest and latest - 500
-                    BlockingCollection<Transaction> trx = GetBlocksAsync(startBlock: startBlock, currentBlock: currentBlock);
-                    _log.Info($"Total trx: {trx.Count.ToString()}");
+                    _log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count.ToString()}");
 
-                    /* Checking succeded transactions */
-                    foreach (var address in _addresses)
+                    foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
+                        _log.Info(
+                            // ReSharper disable once HeapView.BoxingAllocation
+                            $"NB: {numberOfBlocks.ToString()} Evaluating SB: {currentBlock.Value - numberOfBlocks} TB: {currentBlock.Value.ToString()}");
 
-                        var addrStats = new AddressStats {Address = address, BlockRanges = new List<BlockRangeStats>()};
+                        var trxToAnalyze =
+                            addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks)
+                                .ToList();
+                        var succededTrxs =
+                            GetSuccessfulTransactionsForAddress(trxToAnalyze,
+                                address,
+                                stoppingToken);
 
-                        BlockingCollection<Transaction> addrTrxs = new BlockingCollection<Transaction>();
-                        Parallel.ForEach(trx, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, tr =>
+                        _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
+
+                        try
                         {
-                            // Skip if To field is empty
-                            if (tr.To != null && tr.From != null)
+                            // Calculate the success rate and construct che BlockRangeStat object
+                            long successRate = 100 * succededTrxs.Count / trxToAnalyze.Count();
+                            var blockRangeStats = new BlockRangeStats
                             {
-                                // Check if the address is inside From field
-                                if (tr.From.ToLower() == address.ToLower())
-                                {
-                                    addrTrxs.Add(tr);
-                                    return;
-                                } 
-
-                                // Otherwise check if the address is inside the To field (meaning that we are working with a contract
-                                if (tr.To.ToLower() == address.ToLower())
-                                {
-                                    addrTrxs.Add(tr);
-                                    return;
-                                }
+                                BlockRange = numberOfBlocks,
+                                SuccededTranstactionsPerBlockRange = succededTrxs.Count,
+                                TotalTransactionsPerBlockRange = trxToAnalyze.Count(),
+                                SuccessRate = $"{successRate.ToString()}%"
+                            };
+                            if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
+                            {
+                                // Analyze the stats for type of trade
+                                blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}"))
+                                    .ToList();
+                                blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}"))
+                                    .ToList();
+                                blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}"))
+                                    .ToList();
+                                blockRangeStats.ContP = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}"))
+                                    .ToList();
+                                blockRangeStats.T0TrxSucceded = succededTrxs
+                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") != true).ToList();
+                                blockRangeStats.T1TrxSucceded =
+                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}")).ToList();
+                                blockRangeStats.T2TrxSucceded =
+                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}")).ToList();
+                                blockRangeStats.ContPSucceded = succededTrxs
+                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}")).ToList();
                             }
-                        });
-                        _log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count.ToString()}");
-                        foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
-                        {
-                            _log.Info(
-                                $"NB: {numberOfBlocks.ToString()} Evaluating SB: {currentBlock.Value - numberOfBlocks)} TB: {currentBlock.Value.ToString()}");
 
-                            BlockingCollection<Transaction> succededTrxs = new BlockingCollection<Transaction>();
-                            var trxToAnalyze = addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks);
-                            _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
-                            Parallel.ForEach(trxToAnalyze, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, _t =>
-                            {
-                                _log.Debug($"Getting Receipt for trx hash: {_t.TransactionHash}");
-
-                                // Initialize receipt variable
-                                Task<TransactionReceipt> receipt = null;
-
-                                // Try to get the transaction receipt
-                                try
-                                {
-                                    receipt = _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(_t.TransactionHash);
-                                    receipt.Wait();
-                                }
-                                catch (Exception e)
-                                {
-                                    _log.Error(e.ToString());
-                                }
-
-                                if (!(receipt is {Result: { }})) return;
-                                if (!receipt.Result.Status.Value.IsOne || receipt.Result.Logs.Count <= 0) return;
-                                    _log.Debug($"Succeeded trx with hash: {_t.TransactionHash}");
-                                    succededTrxs.Add(_t, stoppingToken);
-                                    // Analyze Tokens
-                                    if (!string.Equals(address, TokenAddressToCompareWith,
-                                        StringComparison.CurrentCultureIgnoreCase)) return;
-                                    {
-                                        var logsList = receipt.Result.Logs.ToList();
-                                        var syncEvents = logsList.Where(
-                                            e => string.Equals(e["topics"][key: 0.ToString()].ToString().ToLower(),
-                                                SyncEventAddress, StringComparison.Ordinal)
-                                        ).ToList();
-                                        foreach (var contract in syncEvents)
-                                        {
-                                            var contractAddress = contract["address"].ToString();
-                                            var contractDetail = _web3.Eth.GetContract(abi: "", contractAddress: contractAddress);
-
-                                        }
-                                        _log.Info(Dump(syncEvents));
-                                    }
-                            });
-                            try
-                            {
-                                // Calculate the success rate and construct che BlockRangeStat object
-                                long successRate = 100 * succededTrxs.Count / trxToAnalyze.Count();
-                                var blockRangeStats = new BlockRangeStats
-                                {
-                                    BlockRange = numberOfBlocks,
-                                    SuccededTranstactionsPerBlockRange = succededTrxs.Count,
-                                    TotalTransactionsPerBlockRange = trxToAnalyze.Count(),
-                                    SuccessRate = $"{successRate.ToString()}%"
-                                };
-                                if (string.Equals(address.ToLower(), ourAddress.ToLower(), StringComparison.Ordinal))
-                                {
-                                    // Analyze the stats for type of trade
-                                    blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") == true).ToList();
-                                    blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}") == true).ToList();
-                                    blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}") == true).ToList();
-                                    blockRangeStats.ContP = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}") == true).ToList();
-                                    blockRangeStats.T0TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") == true).ToList();
-                                    blockRangeStats.T1TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}") == true).ToList();
-                                    blockRangeStats.T2TrxSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}") == true).ToList();
-                                    blockRangeStats.ContPSucceded = succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}") == true).ToList();
-
-                                }
-                                addrStats.BlockRanges.Add(blockRangeStats);
-                            }
-                            catch (System.DivideByZeroException)
-                            {
-                                _log.Error("No transaction retrieved");
-                                continue;
-                            }
+                            addrStats.BlockRanges.Add(blockRangeStats);
                         }
-                        msg.Addresses.Add(addrStats);
+                        catch (DivideByZeroException)
+                        {
+                            _log.Error("No transaction retrieved");
+                        }
                     }
 
-                    msg.TotalTrx = trx.Count;
-                    msg.TPS = trx.Count / blockDurationTime;
+                    msg.Addresses.Add(addrStats);
                 }
 
-                msg.ourAddress = ourAddress;
+                msg.TotalTrx = trx.Count;
+                msg.TPS = trx.Count / _blockDurationTime;
 
-                _telegramNotifier.SendStatsRecap(message: msg);
+                msg.ourAddress = _ourAddress;
 
-                await Task.Delay(_taskDelayMs, stoppingToken);
+                _telegramNotifier.SendStatsRecap(msg);
+
+                await Task.Delay(TaskDelayMs, stoppingToken);
             }
         }
 
         private BlockingCollection<Transaction> GetBlocksAsync(HexBigInteger startBlock, HexBigInteger currentBlock)
         {
-            var  trx = new BlockingCollection<Transaction>();
-            Parallel.For((int)startBlock.Value, (int)currentBlock.Value, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, b =>
-            {
-                _log.Debug($"Processing Block: {b.ToString()}");
-
-                // Initilize null object to be accessible outside try/catch scope
-                Task<Nethereum.RPC.Eth.DTOs.BlockWithTransactions> block = null;
-
-                // Retrieve Transactions inside block X
-                try
+            var trx = new BlockingCollection<Transaction>();
+            Parallel.For((int) startBlock.Value, (int) currentBlock.Value,
+                new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, b =>
                 {
-                    block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new HexBigInteger((BigInteger)b));
-                    block.Wait();
-                }
-                catch (Exception e)
-                {
-                    _log.Error(Dump(e));
-                }
+                    _log.Debug($"Processing Block: {b.ToString()}");
 
-                if (block == null) return;
-                {
-                    foreach (var e in block.Result.Transactions)
+                    // Initilize null object to be accessible outside try/catch scope
+                    Task<BlockWithTransactions> block = null;
+
+                    // Retrieve Transactions inside block X
+                    try
                     {
-                        // Filling the blocking collection
-                        trx.Add(e);
+                        block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
+                            .SendRequestAsync(new HexBigInteger(b));
+                        block.Wait();
                     }
-                }
-            });
+                    catch (Exception e)
+                    {
+                        _log.Error(Dump(e));
+                    }
+
+                    if (block == null) return;
+                    {
+                        foreach (var e in block.Result.Transactions)
+                            // Filling the blocking collection
+                            trx.Add(e);
+                    }
+                });
             return trx;
         }
 
         private static string Dump(object o)
         {
-            return JsonSerializer.Serialize(o, new JsonSerializerOptions { WriteIndented = true });
+            return JsonSerializer.Serialize(o, new JsonSerializerOptions {WriteIndented = true});
+        }
+
+        private static class OpCodes
+        {
+            public static readonly string T0 = new string("085ea7b3");
+            public static readonly string T1 = new string("185ea7b3");
+            public static readonly string T2 = new string("285ea7b3");
+            public static readonly string Cont = new string("985ea7b3");
         }
     }
 }

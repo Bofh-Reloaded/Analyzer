@@ -1,15 +1,10 @@
-﻿using Nethereum.RPC.Eth.DTOs;
-using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Models
 {
     public class ModelsCollection
     {
-        public ModelsCollection()
-        {
-        }
     }
 
     public class Options
@@ -33,6 +28,7 @@ namespace AnalyzerCore.Models
         public List<Transaction> T2TrxSucceded { get; internal set; }
         public List<Transaction> ContPSucceded { get; internal set; }
     }
+
     public class AddressStats
     {
         public string Address { get; set; }

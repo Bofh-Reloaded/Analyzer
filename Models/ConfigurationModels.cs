@@ -4,9 +4,6 @@ namespace AnalyzerCore.Models
 {
     public class ConfigurationModels
     {
-        public ConfigurationModels()
-        {
-        }
     }
 
     public class AnalyzerConfig

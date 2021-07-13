@@ -11,30 +11,35 @@ namespace AnalyzerCore
 {
     public class TelegramAppender : AppenderSkeleton
     {
-        public string Token { get; set; }
-
-        public string ChatId { get; set; }
-
-        public ParseMode ParseMode { get; set; }
-
-        protected static TelegramBotClient Bot;
+        private static TelegramBotClient _bot;
 
         private readonly List<Task> _tasks = new List<Task>();
+
+        public TelegramAppender(string token, string chatId, ParseMode parseMode)
+        {
+            Token = token;
+            ChatId = chatId;
+            ParseMode = parseMode;
+        }
+
+        private string Token { get; }
+
+        private string ChatId { get; }
+
+        private ParseMode ParseMode { get; }
 
         protected override void Append(LoggingEvent e)
         {
             if (string.IsNullOrEmpty(Token))
-            {
-                throw new ConfigurationErrorsException("Please set the Token under TelegramAppender configuration section: <Token>...</Token>");
-            }
+                throw new ConfigurationErrorsException(
+                    "Please set the Token under TelegramAppender configuration section: <Token>...</Token>");
 
             if (string.IsNullOrEmpty(ChatId))
-            {
-                throw new ConfigurationErrorsException("Please set the ChatId under TelegramAppender configuration section: <ChatId>...</ChatId>");
-            }
-            if (Bot == null) Bot = new TelegramBotClient(Token);
+                throw new ConfigurationErrorsException(
+                    "Please set the ChatId under TelegramAppender configuration section: <ChatId>...</ChatId>");
+            _bot ??= new TelegramBotClient(Token);
             var message = Layout == null ? e.RenderedMessage : RenderLoggingEvent(e);
-            _tasks.Add(Bot.SendTextMessageAsync(ChatId, message, ParseMode));
+            _tasks.Add(_bot.SendTextMessageAsync(ChatId, message, ParseMode));
         }
 
         protected override void OnClose()
