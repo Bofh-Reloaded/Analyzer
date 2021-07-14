@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Nethereum.Contracts;
 using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models.GethModels
@@ -49,4 +51,37 @@ namespace AnalyzerCore.Models.GethModels
 
         [JsonProperty("id")] public long Id { get; set; }
     }
+}
+
+public partial class Token0Function : Token0FunctionBase { }
+
+[Function("token0", "address")]
+public class Token0FunctionBase : FunctionMessage
+{
+
+}
+public partial class Token1Function : Token1FunctionBase { }
+
+[Function("token1", "address")]
+public class Token1FunctionBase : FunctionMessage
+{
+
+}
+    
+public partial class Token0OutputDTO : Token0OutputDTOBase { }
+
+[FunctionOutput]
+public class Token0OutputDTOBase : IFunctionOutputDTO 
+{
+    [Parameter("address", "", 1)]
+    public virtual string ReturnValue1 { get; set; }
+}
+
+public partial class Token1OutputDTO : Token1OutputDTOBase { }
+
+[FunctionOutput]
+public class Token1OutputDTOBase : IFunctionOutputDTO 
+{
+    [Parameter("address", "", 1)]
+    public virtual string ReturnValue1 { get; set; }
 }

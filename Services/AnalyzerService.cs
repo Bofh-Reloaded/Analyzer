@@ -12,6 +12,8 @@ using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Nethereum.JsonRpc.Client;
 using Nethereum.RPC.Eth.DTOs;
@@ -25,6 +27,38 @@ namespace AnalyzerCore.Services
         public string ourAddress { get; set; }
     }
 
+    public partial class Token0Function : Token0FunctionBase { }
+
+    [Function("token0", "address")]
+    public class Token0FunctionBase : FunctionMessage
+    {
+
+    }
+    public partial class Token1Function : Token1FunctionBase { }
+
+    [Function("token1", "address")]
+    public class Token1FunctionBase : FunctionMessage
+    {
+
+    }
+    
+    public partial class Token0OutputDTO : Token0OutputDTOBase { }
+
+    [FunctionOutput]
+    public class Token0OutputDTOBase : IFunctionOutputDTO 
+    {
+        [Parameter("address", "", 1)]
+        public virtual string ReturnValue1 { get; set; }
+    }
+
+    public partial class Token1OutputDTO : Token1OutputDTOBase { }
+
+    [FunctionOutput]
+    public class Token1OutputDTOBase : IFunctionOutputDTO 
+    {
+        [Parameter("address", "", 1)]
+        public virtual string ReturnValue1 { get; set; }
+    }
     public class AnalyzerService : BackgroundService
     {
         private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
@@ -62,6 +96,10 @@ namespace AnalyzerCore.Services
         
         private readonly string _ourAddress;
 
+        private readonly TokenListConfig _tokenList;
+
+        private List<string> _missingTokens;
+
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
             int blockDurationTime, int maxParallelism, string ourAddress)
         {
@@ -81,7 +119,7 @@ namespace AnalyzerCore.Services
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("tokens.json", false, true)
                 .Build();
-            var section = configuration.Get<TokenListConfig>();
+            _tokenList = configuration.Get<TokenListConfig>();
 
             // Registering Nethereum Web3 client endpoint
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");
@@ -102,14 +140,13 @@ namespace AnalyzerCore.Services
             }
         }
 
-        private List<Transaction> GetSuccessfulTransactionsForAddress(
+        private List<Transaction> GetSuccessfulTransactions(
             IEnumerable<Transaction> trxToAnalyze,
-            string currentAddress,
-            CancellationToken stoppingToken)
+            CancellationToken stoppingToken,
+            string currentAddress)
         {
             var succededTrxs = new BlockingCollection<Transaction>();
-            Parallel.ForEach(trxToAnalyze, new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism},
-                t =>
+            Parallel.ForEach(trxToAnalyze, new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async t =>
                 {
                     _log.Debug($"Getting Receipt for trx hash: {t.TransactionHash}");
 
@@ -128,16 +165,17 @@ namespace AnalyzerCore.Services
                     {
                         _log.Error(e.ToString());
                     }
-
+                    
                     if (!(receipt is {Result: { }})) return;
-                    if (!receipt.Result.Status.Value.IsOne || receipt.Result.Logs.Count <= 0) return;
+                    if (!receipt.Result.Succeeded() || receipt.Result.Logs.Count <= 0) return;
                     _log.Debug($"Succeeded trx with hash: {t.TransactionHash}");
+                    await AnalyzeMissingTokens(currentAddress, receipt);
                     succededTrxs.Add(t, stoppingToken);
                 });
             return succededTrxs.ToList();
         }
 
-        private void AnalyzeMissingTokens(string currentAddress, Task<TransactionReceipt> receipt)
+        private async Task AnalyzeMissingTokens(string currentAddress, Task<TransactionReceipt> receipt)
         {
             // Analyze Tokens
             if (!string.Equals(currentAddress, TokenAddressToCompareWith,
@@ -145,17 +183,29 @@ namespace AnalyzerCore.Services
             {
                 var logsList = receipt.Result.Logs.ToList();
                 var syncEvents = logsList.Where(
-                    e => string.Equals(e["topics"][0.ToString()].ToString().ToLower(),
+                    e => string.Equals(e["topics"][0].ToString().ToLower(),
                         SyncEventAddress, StringComparison.Ordinal)
                 ).ToList();
                 foreach (var contract in syncEvents)
                 {
                     var contractAddress = contract["address"].ToString();
-                    var contractDetail =
-                        _web3.Eth.GetContract("", contractAddress);
-                }
+                    var contractHandler = _web3.Eth.GetContractHandler(contractAddress);
+                    var token0 = await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
+                    var token1 =
+                        await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
 
-                _log.Info(Dump(syncEvents));
+                    if (!_tokenList.whitelisted.Contains(token0.ReturnValue1))
+                    {
+                        if (!_missingTokens.Contains(token0.ReturnValue1)) _missingTokens.Add(token0.ReturnValue1);
+                        _log.Info($"Found missing token: {token0.ReturnValue1}");
+                    }
+
+                    if (!_tokenList.whitelisted.Contains(token1.ReturnValue1))
+                    {
+                        if (!_missingTokens.Contains(token1.ReturnValue1)) _missingTokens.Add(token1.ReturnValue1);
+                        _log.Info($"Found missing token: {token1.ReturnValue1}");
+                    }
+                }
             }
         }
 
@@ -165,6 +215,7 @@ namespace AnalyzerCore.Services
             _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}");
             stoppingToken.Register(() =>
                 _log.Info($"AnalyzerService background task is stopping for chain: {_chainName}"));
+            _missingTokens = new List<string>();
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -210,9 +261,7 @@ namespace AnalyzerCore.Services
                             addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks)
                                 .ToList();
                         var succededTrxs =
-                            GetSuccessfulTransactionsForAddress(trxToAnalyze,
-                                address,
-                                stoppingToken);
+                            GetSuccessfulTransactions(trxToAnalyze, stoppingToken, address);
 
                         _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
 
@@ -238,14 +287,18 @@ namespace AnalyzerCore.Services
                                     .ToList();
                                 blockRangeStats.ContP = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}"))
                                     .ToList();
-                                blockRangeStats.T0TrxSucceded = succededTrxs
-                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.T0}") != true).ToList();
+                                blockRangeStats.T0TrxSucceded = 
+                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}"))
+                                        .ToList();
                                 blockRangeStats.T1TrxSucceded =
-                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}")).ToList();
+                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}"))
+                                        .ToList();
                                 blockRangeStats.T2TrxSucceded =
-                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}")).ToList();
+                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}"))
+                                        .ToList();
                                 blockRangeStats.ContPSucceded = succededTrxs
-                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}")).ToList();
+                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}"))
+                                    .ToList();
                             }
 
                             addrStats.BlockRanges.Add(blockRangeStats);
@@ -265,6 +318,10 @@ namespace AnalyzerCore.Services
                 msg.ourAddress = _ourAddress;
 
                 _telegramNotifier.SendStatsRecap(msg);
+                if (_missingTokens.Count > 0)
+                    _telegramNotifier.SendMessage(
+                        $"Missing Tokens: {Environment.NewLine} {string.Join(Environment.NewLine, _missingTokens.ToArray())}");
+                _missingTokens.Clear();
 
                 await Task.Delay(TaskDelayMs, stoppingToken);
             }
