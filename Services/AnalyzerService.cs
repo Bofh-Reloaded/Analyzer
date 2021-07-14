@@ -12,8 +12,6 @@ using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
-using Nethereum.ABI.FunctionEncoding.Attributes;
-using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Nethereum.JsonRpc.Client;
 using Nethereum.RPC.Eth.DTOs;
@@ -21,44 +19,6 @@ using Nethereum.Web3;
 
 namespace AnalyzerCore.Services
 {
-    public class Options
-    {
-        public List<string> addresses { get; set; }
-        public string ourAddress { get; set; }
-    }
-
-    public partial class Token0Function : Token0FunctionBase { }
-
-    [Function("token0", "address")]
-    public class Token0FunctionBase : FunctionMessage
-    {
-
-    }
-    public partial class Token1Function : Token1FunctionBase { }
-
-    [Function("token1", "address")]
-    public class Token1FunctionBase : FunctionMessage
-    {
-
-    }
-    
-    public partial class Token0OutputDTO : Token0OutputDTOBase { }
-
-    [FunctionOutput]
-    public class Token0OutputDTOBase : IFunctionOutputDTO 
-    {
-        [Parameter("address", "", 1)]
-        public virtual string ReturnValue1 { get; set; }
-    }
-
-    public partial class Token1OutputDTO : Token1OutputDTOBase { }
-
-    [FunctionOutput]
-    public class Token1OutputDTOBase : IFunctionOutputDTO 
-    {
-        [Parameter("address", "", 1)]
-        public virtual string ReturnValue1 { get; set; }
-    }
     public class AnalyzerService : BackgroundService
     {
         private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
