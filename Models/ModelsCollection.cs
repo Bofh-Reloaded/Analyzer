@@ -43,4 +43,9 @@ namespace AnalyzerCore.Models
         public int TotalTrx { get; internal set; }
         public string ourAddress { get; internal set; }
     }
+
+    public class MissingTokens
+    {
+        public List<Dictionary<string, string>> Tokens { get; set; }
+    }
 }

@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
 
         private readonly TokenListConfig _tokenList;
 
-        private List<string> _missingTokens;
+        private MissingTokens _missingTokens = new MissingTokens();
 
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
             int blockDurationTime, int maxParallelism, string ourAddress)
@@ -146,27 +146,29 @@ namespace AnalyzerCore.Services
                     e => string.Equals(e["topics"][0].ToString().ToLower(),
                         SyncEventAddress, StringComparison.Ordinal)
                 ).ToList();
-                foreach (var contract in syncEvents)
+                foreach (var contractHandler in syncEvents.Select(contract => contract["address"]
+                        .ToString())
+                    .Select(contractAddress => _web3.Eth.GetContractHandler(contractAddress)))
                 {
-                    var contractAddress = contract["address"].ToString();
-                    var contractHandler = _web3.Eth.GetContractHandler(contractAddress);
-                    var token0 = await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                    var token1 =
+                    var token0OutputDto =
+                        await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
+                    var token1OutputDto =
                         await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-
-                    if (!_tokenList.whitelisted.Contains(token0.ReturnValue1))
-                    {
-                        if (!_missingTokens.Contains(token0.ReturnValue1)) _missingTokens.Add(token0.ReturnValue1);
-                        _log.Info($"Found missing token: {token0.ReturnValue1}");
-                    }
-
-                    if (!_tokenList.whitelisted.Contains(token1.ReturnValue1))
-                    {
-                        if (!_missingTokens.Contains(token1.ReturnValue1)) _missingTokens.Add(token1.ReturnValue1);
-                        _log.Info($"Found missing token: {token1.ReturnValue1}");
-                    }
+                    var token0 = token0OutputDto.ReturnValue1;
+                    var token1 = token1OutputDto.ReturnValue1;
+                    EvaluateToken(token0, receipt);
+                    EvaluateToken(token1, receipt);
                 }
             }
+        }
+si
+        private void EvaluateToken(string token, Task<TransactionReceipt> receipt)
+        {
+            if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
+            if (_missingTokens.Tokens.First(d => d.ContainsKey(token)).Count > 0) return;
+            _log.Info($"Found missing token: {token}");
+            var dict = new Dictionary<string, string> {{token, receipt.Result.TransactionHash}};
+            _missingTokens.Tokens.Add(dict);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -175,7 +177,6 @@ namespace AnalyzerCore.Services
             _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}");
             stoppingToken.Register(() =>
                 _log.Info($"AnalyzerService background task is stopping for chain: {_chainName}"));
-            _missingTokens = new List<string>();
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -278,10 +279,10 @@ namespace AnalyzerCore.Services
                 msg.ourAddress = _ourAddress;
 
                 _telegramNotifier.SendStatsRecap(msg);
-                if (_missingTokens.Count > 0)
+                if (_missingTokens.Tokens.Count > 0)
                     _telegramNotifier.SendMessage(
-                        $"Missing Tokens: {Environment.NewLine} {string.Join(Environment.NewLine, _missingTokens.ToArray())}");
-                _missingTokens.Clear();
+                        $"Missing Tokens: {Environment.NewLine} {string.Join(Environment.NewLine, _missingTokens.Tokens.ToArray())}");
+                _missingTokens.Tokens.Clear();
 
                 await Task.Delay(TaskDelayMs, stoppingToken);
             }
