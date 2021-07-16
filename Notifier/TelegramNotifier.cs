@@ -36,7 +36,7 @@ namespace AnalyzerCore.Notifier
             await _bot.SendTextMessageAsync(
                 _chatId,
                 text,
-                ParseMode.Markdown
+                ParseMode.Html
             );
         }
 

@@ -93,3 +93,11 @@ public class Token1OutputDTOBase : IFunctionOutputDTO
     [Parameter("address", "", 1)]
     public virtual string ReturnValue1 { get; set; }
 }
+
+public partial class FactoryFunction : FactoryFunctionBase { }
+
+[Function("factory", "address")]
+public class FactoryFunctionBase : FunctionMessage
+{
+
+}

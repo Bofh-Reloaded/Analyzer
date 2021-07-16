@@ -44,8 +44,10 @@ namespace AnalyzerCore.Models
         public string ourAddress { get; internal set; }
     }
 
-    public class MissingTokens
+    public class MissingToken
     {
-        public List<Dictionary<string, string>> Tokens { get; set; }
+        public string TokenAddress { get; set; }
+        public string TransactionHash { get; set; }
+        public string PoolFactory { get; set; }
     }
 }

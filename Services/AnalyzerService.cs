@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
 
         private readonly TokenListConfig _tokenList;
 
-        private MissingTokens _missingTokens = new MissingTokens();
+        private readonly List<MissingToken> _missingTokens = new();
 
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
             int blockDurationTime, int maxParallelism, string ourAddress)
@@ -152,23 +152,29 @@ namespace AnalyzerCore.Services
                 {
                     var token0OutputDto =
                         await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
+                    var poolFactory = await contractHandler.QueryAsync<FactoryFunction, string>();
                     var token1OutputDto =
                         await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
                     var token0 = token0OutputDto.ReturnValue1;
                     var token1 = token1OutputDto.ReturnValue1;
-                    EvaluateToken(token0, receipt);
-                    EvaluateToken(token1, receipt);
+                    EvaluateToken(token0, receipt, poolFactory);
+                    EvaluateToken(token1, receipt, poolFactory);
                 }
             }
         }
-si
-        private void EvaluateToken(string token, Task<TransactionReceipt> receipt)
+
+        private void EvaluateToken(string token, Task<TransactionReceipt> receipt, string factory)
         {
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
-            if (_missingTokens.Tokens.First(d => d.ContainsKey(token)).Count > 0) return;
-            _log.Info($"Found missing token: {token}");
-            var dict = new Dictionary<string, string> {{token, receipt.Result.TransactionHash}};
-            _missingTokens.Tokens.Add(dict);
+            if ((_missingTokens.Where(m => m.TokenAddress == token)).Any()) return;
+            _log.Info(
+                $"Found missing token: {token} with txhash: {receipt.Result.TransactionHash} within exchange: {factory}");
+            _missingTokens.Add(new MissingToken()
+            {
+                PoolFactory = factory,
+                TokenAddress = token,
+                TransactionHash = receipt.Result.TransactionHash
+            });
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -279,10 +285,19 @@ si
                 msg.ourAddress = _ourAddress;
 
                 _telegramNotifier.SendStatsRecap(msg);
-                if (_missingTokens.Tokens.Count > 0)
-                    _telegramNotifier.SendMessage(
-                        $"Missing Tokens: {Environment.NewLine} {string.Join(Environment.NewLine, _missingTokens.Tokens.ToArray())}");
-                _missingTokens.Tokens.Clear();
+                if (_missingTokens.Count > 0)
+                {
+                    var missingTokenMessage = _missingTokens.Select(missingToken =>
+                            $"[Token: {missingToken.TokenAddress}, Exchange: {missingToken.PoolFactory}]{Environment.NewLine}")
+                        .ToList();
+                    _telegramNotifier.SendMessage("\U00002728 <b>Missing Tokens</b> \U00002728");
+                    _telegramNotifier.SendMessage(string.Join(
+                        Environment.NewLine,
+                        missingTokenMessage.ToArray()));
+                }
+                    
+                    
+                _missingTokens.Clear();
 
                 await Task.Delay(TaskDelayMs, stoppingToken);
             }
