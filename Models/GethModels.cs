@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
+﻿using System.Collections.Generic;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Nethereum.Contracts;
 using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models.GethModels
@@ -43,16 +43,61 @@ namespace AnalyzerCore.Models.GethModels
 
     public class TransactionReceiptJsonRequest
     {
-        [JsonProperty("jsonrpc")]
-        public string Jsonrpc { get; set; }
+        [JsonProperty("jsonrpc")] public string Jsonrpc { get; set; }
 
-        [JsonProperty("method")]
-        public string Method { get; set; }
+        [JsonProperty("method")] public string Method { get; set; }
 
-        [JsonProperty("params")]
-        public List<string> Params { get; set; }
+        [JsonProperty("params")] public List<string> Params { get; set; }
 
-        [JsonProperty("id")]
-        public long Id { get; set; }
+        [JsonProperty("id")] public long Id { get; set; }
     }
+}
+
+public static class OpCodes
+{
+    public static readonly string T0 = new string("085ea7b3");
+    public static readonly string T1 = new string("185ea7b3");
+    public static readonly string T2 = new string("285ea7b3");
+    public static readonly string Cont = new string("985ea7b3");
+}
+
+public partial class Token0Function : Token0FunctionBase { }
+
+[Function("token0", "address")]
+public class Token0FunctionBase : FunctionMessage
+{
+
+}
+public partial class Token1Function : Token1FunctionBase { }
+
+[Function("token1", "address")]
+public class Token1FunctionBase : FunctionMessage
+{
+
+}
+    
+public partial class Token0OutputDTO : Token0OutputDTOBase { }
+
+[FunctionOutput]
+public class Token0OutputDTOBase : IFunctionOutputDTO 
+{
+    [Parameter("address", "", 1)]
+    public virtual string ReturnValue1 { get; set; }
+}
+
+public partial class Token1OutputDTO : Token1OutputDTOBase { }
+
+[FunctionOutput]
+public class Token1OutputDTOBase : IFunctionOutputDTO 
+{
+    [Parameter("address", "", 1)]
+    public virtual string ReturnValue1 { get; set; }
+}
+
+public partial class FactoryFunction : FactoryFunctionBase { }
+
+[Function("factory", "address")]
+public class FactoryFunctionBase : FunctionMessage
+{
+
 }

@@ -1,124 +1,102 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Reflection;
+using AnalyzerCore.Models;
+using AnalyzerCore.Notifier;
+using AnalyzerCore.Services;
 using log4net;
 using log4net.Config;
 using log4net.Core;
+using log4net.Repository.Hierarchy;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using AnalyzerCore.Services;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using System;
 
 namespace AnalyzerCore
 {
-    class Program
+    internal static class Program
     {
-        private static readonly ILog log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod().DeclaringType
-            );
-
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
 
             CreateHostBuilder(args).Build().Run();
         }
 
-        public class AnalyzerConfig
+        private static IHostBuilder CreateHostBuilder(string[] args)
         {
-            public string PlyAddress { get; set; }
-            public string BscAddress { get; set; }
-            public string HecoAddress { get; set; }
-            public List<string> PlyEnemies { get; set; }
-            public List<string> BscEnemies { get; set; }
-            public List<string> HecoEnemies { get; set; }
+            return Host.CreateDefaultBuilder(args)
+                .ConfigureServices(services =>
+                {
+                    // Define Configuration File Reader
+                    IConfiguration configuration = new ConfigurationBuilder()
+                        .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                        .AddJsonFile("appSettings.json", false, true)
+                        .Build();
+
+                    // Map json configuration inside Object
+                    var section = configuration.GetSection(nameof(AnalyzerConfig));
+                    var analyzerConfig = section.Get<AnalyzerConfig>();
+                    var servicesSection = configuration.GetSection("ServicesConfig");
+                    var servicesConfig = servicesSection.Get<ServicesConfig>();
+
+                    if (servicesConfig.PlyPendingEnabled)
+                        services.AddSingleton<IHostedService>(
+                            _ => new SubscribedService(
+                                new TelegramNotifier("-532850503"),
+                                "PolygonPending")
+                        );
+
+                    if (servicesConfig.PlyEnabled)
+                        // Create and add the HostedService for Polygon
+                        services.AddSingleton<IHostedService>(
+                            _ => new AnalyzerService(
+                                "Polygon",
+                                "http://162.55.94.149:8545",
+                                analyzerConfig.PlyEnemies,
+                                new TelegramNotifier(
+                                    "-532850503"),
+                                3,
+                                servicesConfig.MaxParallelism,
+                                analyzerConfig.PlyAddress,
+                                false
+                            )
+                        );
+
+                    if (servicesConfig.BscEnabled)
+                        // Create and add the HostedService for Binance Smart Chain
+                        services.AddSingleton<IHostedService>(
+                            _ => new AnalyzerService(
+                                "BinanceSmartChain",
+                                "http://144.76.94.124:8545",
+                                analyzerConfig.BscEnemies,
+                                new TelegramNotifier(
+                                    "-560874043"),
+                                5,
+                                servicesConfig.MaxParallelism,
+                                analyzerConfig.BscAddress,
+                                false
+                            )
+                        );
+
+                    if (servicesConfig.HecoEnabled)
+                        // Create and add the HostedService for Heco Chain
+                        services.AddSingleton<IHostedService>(
+                            _ => new AnalyzerService(
+                                "HecoChain",
+                                "http://155.138.154.45:8545",
+                                analyzerConfig.HecoEnemies,
+                                new TelegramNotifier(
+                                    "-516536036"),
+                                3,
+                                servicesConfig.MaxParallelism,
+                                analyzerConfig.HecoAddress,
+                                false
+                            )
+                        );
+                });
         }
-
-        public class ServicesConfig
-        {
-            public bool BscEnabled { get; set; }
-            public bool PlyEnabled { get; set; }
-            public bool HecoEnabled { get; set; }
-            public bool PlyPendingEnabled { get; set; }
-            public int MaxParallelism { get; set; }
-        }
-
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .ConfigureServices(services =>
-            {
-                // Define Configuration File Reader
-                IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appSettings.json", false, reloadOnChange: true)
-                .Build();
-
-                // Map json configuration inside Object
-                var section = configuration.GetSection(nameof(AnalyzerConfig));
-                var analyzerConfig = section.Get<AnalyzerConfig>();
-                var servicesSection = configuration.GetSection("ServicesConfig");
-                var servicesConfig = servicesSection.Get<ServicesConfig>();
-
-                if (servicesConfig.PlyPendingEnabled)
-                {
-                    services.AddSingleton<IHostedService>(
-                        _ => new SubscribedService()
-                        );
-                }
-
-                if (servicesConfig.PlyEnabled)
-                {
-                    // Create and add the HostedService for Polygon
-                    services.AddSingleton<IHostedService>(
-                        _ => new AnalyzerService(
-                            chainName: "Polygon",
-                            uri: "http://162.55.94.149:8545",
-                            addresses: analyzerConfig.PlyEnemies,
-                            telegramNotifier: new Notifier.TelegramNotifier(
-                                chatId: "-532850503"),
-                            blockDurationTime: 3,
-                            maxParallelism: servicesConfig.MaxParallelism,
-                            ourAddress: analyzerConfig.PlyAddress
-                            )
-                        );
-                }
-                
-                if (servicesConfig.BscEnabled)
-                {
-                    // Create and add the HostedService for Binance Smart Chain
-                    services.AddSingleton<IHostedService>(
-                        _ => new AnalyzerService(
-                            chainName: "BinanceSmartChain",
-                            uri: "http://135.148.123.21:8545",
-                            addresses: analyzerConfig.BscEnemies,
-                            telegramNotifier: new Notifier.TelegramNotifier(
-                                chatId: "-560874043"),
-                            blockDurationTime: 5,
-                            maxParallelism: servicesConfig.MaxParallelism,
-                            ourAddress: analyzerConfig.BscAddress
-                            )
-                        );
-                }
-
-                if (servicesConfig.HecoEnabled)
-                {
-                    // Create and add the HostedService for Heco Chain
-                    services.AddSingleton<IHostedService>(
-                        _ => new AnalyzerService(
-                            chainName: "HecoChain",
-                            uri: "http://140.82.61.75:8545",
-                            addresses: analyzerConfig.HecoEnemies,
-                            telegramNotifier: new Notifier.TelegramNotifier(
-                                chatId: "-516536036"),
-                            blockDurationTime: 3,
-                            maxParallelism: servicesConfig.MaxParallelism,
-                            ourAddress: analyzerConfig.HecoAddress
-                            )
-                        );
-                }
-            });
     }
 }

@@ -7,10 +7,13 @@ namespace AnalyzerCore.Services
 {
     public abstract class BackgroundService : IHostedService, IDisposable
     {
-        private Task _executingTask;
         private readonly CancellationTokenSource _stoppingCts = new CancellationTokenSource();
+        private Task _executingTask;
 
-        protected abstract Task ExecuteAsync(CancellationToken stoppingToken);
+        public virtual void Dispose()
+        {
+            _stoppingCts.Cancel();
+        }
 
         public virtual Task StartAsync(CancellationToken cancellationToken)
         {
@@ -19,22 +22,15 @@ namespace AnalyzerCore.Services
 
             // If the task is completed then return it,
             // this will bubble cancellation and failure to the caller
-            if (_executingTask.IsCompleted)
-            {
-                return _executingTask;
-            }
+            return _executingTask.IsCompleted ? _executingTask : Task.CompletedTask;
 
             // Otherwise it's running
-            return Task.CompletedTask;
         }
 
         public virtual async Task StopAsync(CancellationToken cancellationToken)
         {
             // Stop called without start
-            if (_executingTask == null)
-            {
-                return;
-            }
+            if (_executingTask == null) return;
 
             try
             {
@@ -48,12 +44,8 @@ namespace AnalyzerCore.Services
                     Timeout.Infinite,
                     cancellationToken));
             }
-
         }
 
-        public virtual void Dispose()
-        {
-            _stoppingCts.Cancel();
-        }
+        protected abstract Task ExecuteAsync(CancellationToken stoppingToken);
     }
 }
