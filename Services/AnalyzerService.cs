@@ -59,9 +59,10 @@ namespace AnalyzerCore.Services
         private readonly TokenListConfig _tokenList;
 
         private readonly List<MissingToken> _missingTokens = new();
+        private readonly bool _tokenAnalysis;
 
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
-            int blockDurationTime, int maxParallelism, string ourAddress)
+            int blockDurationTime, int maxParallelism, string ourAddress, bool tokenAnalysis)
         {
             if (blockDurationTime <= 0) throw new ArgumentOutOfRangeException(nameof(blockDurationTime));
             if (maxParallelism <= 0) throw new ArgumentOutOfRangeException(nameof(maxParallelism));
@@ -73,6 +74,7 @@ namespace AnalyzerCore.Services
             _maxParallelism = maxParallelism;
             _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
             _addresses.Add(ourAddress);
+            _tokenAnalysis = tokenAnalysis;
 
             // Load configuration regarding tokens
             IConfiguration configuration = new ConfigurationBuilder()
@@ -129,7 +131,7 @@ namespace AnalyzerCore.Services
                     if (!(receipt is {Result: { }})) return;
                     if (!receipt.Result.Succeeded() || receipt.Result.Logs.Count <= 0) return;
                     _log.Debug($"Succeeded trx with hash: {t.TransactionHash}");
-                    await AnalyzeMissingTokens(currentAddress, receipt);
+                    if (_tokenAnalysis) await AnalyzeMissingTokens(currentAddress, receipt);
                     succededTrxs.Add(t, stoppingToken);
                 });
             return succededTrxs.ToList();

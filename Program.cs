@@ -60,7 +60,8 @@ namespace AnalyzerCore
                                     "-532850503"),
                                 3,
                                 servicesConfig.MaxParallelism,
-                                analyzerConfig.PlyAddress
+                                analyzerConfig.PlyAddress,
+                                false
                             )
                         );
 
@@ -75,7 +76,8 @@ namespace AnalyzerCore
                                     "-560874043"),
                                 5,
                                 servicesConfig.MaxParallelism,
-                                analyzerConfig.BscAddress
+                                analyzerConfig.BscAddress,
+                                false
                             )
                         );
 
@@ -84,13 +86,14 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "HecoChain",
-                                "http://162.55.99.62:8545",
+                                "http://155.138.154.45:8545",
                                 analyzerConfig.HecoEnemies,
                                 new TelegramNotifier(
                                     "-516536036"),
                                 3,
                                 servicesConfig.MaxParallelism,
-                                analyzerConfig.HecoAddress
+                                analyzerConfig.HecoAddress,
+                                false
                             )
                         );
                 });

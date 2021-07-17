@@ -21,6 +21,7 @@ namespace AnalyzerCore.Models
         public bool BscEnabled { get; set; }
         public bool PlyEnabled { get; set; }
         public bool HecoEnabled { get; set; }
+        public bool TokenAnalysis { get; set; }
         public bool PlyPendingEnabled { get; set; }
         public int MaxParallelism { get; set; }
     }
