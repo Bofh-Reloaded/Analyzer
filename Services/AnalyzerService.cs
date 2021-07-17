@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
 
         private readonly TokenListConfig _tokenList;
 
-        private readonly List<MissingToken> _missingTokens = new();
+        private readonly List<MissingToken> _missingTokens = new List<MissingToken>();
         private readonly bool _tokenAnalysis;
 
         public AnalyzerService(string chainName, string uri, List<string> addresses, TelegramNotifier telegramNotifier,
