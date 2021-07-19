@@ -77,7 +77,7 @@ namespace AnalyzerCore
                                 5,
                                 servicesConfig.MaxParallelism,
                                 analyzerConfig.BscAddress,
-                                false
+                                true
                             )
                         );
 
