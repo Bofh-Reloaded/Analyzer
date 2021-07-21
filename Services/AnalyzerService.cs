@@ -13,7 +13,6 @@ using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Hex.HexTypes;
-using Nethereum.JsonRpc.Client;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
 
@@ -87,56 +86,7 @@ namespace AnalyzerCore.Services
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");
             _web3 = new Web3(uri);
         }
-
-
-        private async Task<HexBigInteger> GetCurrentBlock()
-        {
-            try
-            {
-                return await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
-            }
-            catch (RpcClientTimeoutException)
-            {
-                _log.Error($"Cannot connect to RPC for chain: {_chainName}");
-                throw;
-            }
-        }
-
-        private List<Transaction> GetSuccessfulTransactions(
-            IEnumerable<Transaction> trxToAnalyze,
-            CancellationToken stoppingToken,
-            string currentAddress)
-        {
-            var succededTrxs = new BlockingCollection<Transaction>();
-            Parallel.ForEach(trxToAnalyze, new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async t =>
-                {
-                    _log.Debug($"Getting Receipt for trx hash: {t.TransactionHash}");
-
-                    // Initialize receipt variable
-                    Task<TransactionReceipt> receipt = null;
-
-                    // Try to get the transaction receipt
-                    try
-                    {
-                        receipt =
-                            _web3.Eth.Transactions.GetTransactionReceipt
-                                .SendRequestAsync(t.TransactionHash);
-                        receipt.Wait(stoppingToken);
-                    }
-                    catch (Exception e)
-                    {
-                        _log.Error(e.ToString());
-                    }
-                    
-                    if (!(receipt is {Result: { }})) return;
-                    if (!receipt.Result.Succeeded() || receipt.Result.Logs.Count <= 0) return;
-                    _log.Debug($"Succeeded trx with hash: {t.TransactionHash}");
-                    if (_tokenAnalysis) await AnalyzeMissingTokens(currentAddress, receipt);
-                    succededTrxs.Add(t, stoppingToken);
-                });
-            return succededTrxs.ToList();
-        }
-
+        
         private async Task AnalyzeMissingTokens(string currentAddress, Task<TransactionReceipt> receipt)
         {
             // Analyze Tokens
@@ -170,7 +120,7 @@ namespace AnalyzerCore.Services
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
             if ((_missingTokens.Where(m => m.TokenAddress == token)).Any()) return;
             _log.Info(
-                $"Found missing token: {token} with txhash: {receipt.Result.TransactionHash} within exchange: {factory}");
+                $"Found missing Token: {token} with TxHash: {receipt.Result.TransactionHash} within Exchange: {factory}");
             _missingTokens.Add(new MissingToken()
             {
                 PoolFactory = factory,
@@ -197,8 +147,10 @@ namespace AnalyzerCore.Services
                         $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550</b>"
                 };
 
+                var chainData = new DataCollectorService.ChainData(_web3, _chainName, _maxParallelism, _log);
+
                 // Get Current Block
-                var currentBlock = await GetCurrentBlock();
+                var currentBlock = chainData.CurrentBlock;
 
                 if (currentBlock is null)
                 {
@@ -209,16 +161,18 @@ namespace AnalyzerCore.Services
                 var startBlock = new HexBigInteger(currentBlock.Value - NumbersOfBlocksToAnalyze.Max());
 
                 // Get all the transactions inside the blocks between latest and latest - 500
-                var trx = GetBlocksAsync(startBlock, currentBlock);
-                _log.Info($"Total trx: {trx.Count.ToString()}");
+                chainData.GetBlocksAsync((long)startBlock.Value, (long)currentBlock.Value);
+                _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
 
                 /* Checking succeded transactions */
                 foreach (var address in _addresses)
                 {
                     var addrStats = new AddressStats {Address = address, BlockRanges = new List<BlockRangeStats>()};
-                    var addrTrxs = trx.Where(t => t.IsFrom(address) || t.IsTo(address)).ToList();
+                    // Init Transactions Data
+                    chainData.GetAddressTransactions(address);
 
-                    _log.Info($"Evaluating Address: {address} with trx amount: {addrTrxs.Count.ToString()}");
+                    _log.Info(
+                        $"Evaluating Address: {address} with trx amount: {chainData.Addresses[address].Transactions.Count.ToString()}");
 
                     foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
                     {
@@ -227,12 +181,13 @@ namespace AnalyzerCore.Services
                             $"NB: {numberOfBlocks.ToString()} Evaluating SB: {currentBlock.Value - numberOfBlocks} TB: {currentBlock.Value.ToString()}");
 
                         var trxToAnalyze =
-                            addrTrxs.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks)
+                            chainData.Addresses[address]
+                                .Transactions.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks)
                                 .ToList();
-                        var succededTrxs =
-                            GetSuccessfulTransactions(trxToAnalyze, stoppingToken, address);
+                        var succededTrxs = chainData.Addresses[address].Transactions
+                            .Where(t => t.Receipt.Succeeded() == true).ToList();
 
-                        _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
+                            _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
 
                         try
                         {
@@ -242,7 +197,7 @@ namespace AnalyzerCore.Services
                             {
                                 BlockRange = numberOfBlocks,
                                 SuccededTranstactionsPerBlockRange = succededTrxs.Count,
-                                TotalTransactionsPerBlockRange = trxToAnalyze.Count(),
+                                TotalTransactionsPerBlockRange = trxToAnalyze.Count,
                                 SuccessRate = $"{successRate.ToString()}%"
                             };
                             if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
@@ -281,21 +236,18 @@ namespace AnalyzerCore.Services
                     msg.Addresses.Add(addrStats);
                 }
 
-                msg.TotalTrx = trx.Count;
-                msg.TPS = trx.Count / _blockDurationTime;
+                msg.TotalTrx = chainData.Transactions.Count;
+                msg.TPS = chainData.Transactions.Count / _blockDurationTime;
 
                 msg.ourAddress = _ourAddress;
 
                 _telegramNotifier.SendStatsRecap(msg);
                 if (_missingTokens.Count > 0)
                 {
-                    var missingTokenMessage = _missingTokens.Select(missingToken =>
-                            $"[Token: {missingToken.TokenAddress}, Exchange: {missingToken.PoolFactory}]{Environment.NewLine}")
-                        .ToList();
-                    _telegramNotifier.SendMessage("\U00002728 <b>Missing Tokens</b> \U00002728");
-                    _telegramNotifier.SendMessage(string.Join(
-                        Environment.NewLine,
-                        missingTokenMessage.ToArray()));
+                    await using var createStream = File.Create(@"missingTokens.json");
+                    await JsonSerializer.SerializeAsync(createStream,
+                        JsonSerializer.Serialize(_missingTokens), cancellationToken: stoppingToken);
+                    await createStream.DisposeAsync();
                 }
                     
                     
@@ -303,39 +255,6 @@ namespace AnalyzerCore.Services
 
                 await Task.Delay(TaskDelayMs, stoppingToken);
             }
-        }
-
-        private BlockingCollection<Transaction> GetBlocksAsync(HexBigInteger startBlock, HexBigInteger currentBlock)
-        {
-            var trx = new BlockingCollection<Transaction>();
-            Parallel.For((int) startBlock.Value, (int) currentBlock.Value,
-                new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, b =>
-                {
-                    _log.Debug($"Processing Block: {b.ToString()}");
-
-                    // Initilize null object to be accessible outside try/catch scope
-                    Task<BlockWithTransactions> block = null;
-
-                    // Retrieve Transactions inside block X
-                    try
-                    {
-                        block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
-                            .SendRequestAsync(new HexBigInteger(b));
-                        block.Wait();
-                    }
-                    catch (Exception e)
-                    {
-                        _log.Error(Dump(e));
-                    }
-
-                    if (block == null) return;
-                    {
-                        foreach (var e in block.Result.Transactions)
-                            // Filling the blocking collection
-                            trx.Add(e);
-                    }
-                });
-            return trx;
         }
 
         private static string Dump(object o)

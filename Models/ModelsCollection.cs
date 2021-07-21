@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using AnalyzerCore.Services;
 using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Models
@@ -19,14 +20,14 @@ namespace AnalyzerCore.Models
         public int SuccededTranstactionsPerBlockRange { get; set; }
         public int TotalTransactionsPerBlockRange { get; set; }
         public string SuccessRate { get; set; }
-        public List<Transaction> T0Trx { get; internal set; }
-        public List<Transaction> T1Trx { get; internal set; }
-        public List<Transaction> T2Trx { get; internal set; }
-        public List<Transaction> ContP { get; internal set; }
-        public List<Transaction> T0TrxSucceded { get; internal set; }
-        public List<Transaction> T1TrxSucceded { get; internal set; }
-        public List<Transaction> T2TrxSucceded { get; internal set; }
-        public List<Transaction> ContPSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T0Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T1Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T2Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> ContP { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T0TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T1TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T2TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> ContPSucceded { get; internal set; }
     }
 
     public class AddressStats
