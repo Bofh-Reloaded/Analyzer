@@ -86,7 +86,7 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "HecoChain",
-                                "http://155.138.154.45:8545",
+                                "http://188.40.85.49:8545",
                                 analyzerConfig.HecoEnemies,
                                 new TelegramNotifier(
                                     "-516536036"),
