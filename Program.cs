@@ -20,7 +20,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
 
             CreateHostBuilder(args).Build().Run();
         }

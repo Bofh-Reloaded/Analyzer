@@ -73,8 +73,7 @@ namespace AnalyzerCore.Services
                         block.Wait();
                         foreach (var e in block.Result.Transactions)
                         {
-                            var enTx = (EnTransaction) e;
-                            enTx.Client = _web3;
+                            var enTx = new EnTransaction {Transaction = e, Client = _web3};
                             enTx.GetReceipt();
                             // Filling the blocking collection
                             Transactions.Add(enTx);
@@ -86,7 +85,7 @@ namespace AnalyzerCore.Services
             {
                 Addresses[address] = new Address
                 {
-                    Transactions = Transactions.Where(t => t.IsFrom(address) || t.IsTo(address))
+                    Transactions = Transactions.Where(t => t.Transaction.IsFrom(address) || t.Transaction.IsTo(address))
                         .ToList()
                 };
             }
@@ -96,17 +95,17 @@ namespace AnalyzerCore.Services
                 public List<EnTransaction> Transactions { get; set; }
             }
 
-            public class EnTransaction : Transaction
+            public class EnTransaction
             {
                 public Web3 Client { get; set; }
                 public TransactionReceipt Receipt { get; set; }
                 
-                public void GetReceipt()
+                public Transaction Transaction { get; set; }
+                
+                public async Task GetReceipt()
                 {
-                    var receipt = Client.Eth.Transactions.GetTransactionReceipt
-                            .SendRequestAsync(TransactionHash);
-                    receipt.Wait();
-                    Receipt = receipt.Result;
+                    Receipt = await Client.Eth.Transactions.GetTransactionReceipt
+                            .SendRequestAsync(Transaction.TransactionHash);
                 }
             }
         }

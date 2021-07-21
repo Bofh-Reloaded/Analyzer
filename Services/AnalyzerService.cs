@@ -182,7 +182,7 @@ namespace AnalyzerCore.Services
 
                         var trxToAnalyze =
                             chainData.Addresses[address]
-                                .Transactions.Where(t => t.BlockNumber >= currentBlock.Value - numberOfBlocks)
+                                .Transactions.Where(t => t.Transaction.BlockNumber >= currentBlock.Value - numberOfBlocks)
                                 .ToList();
                         var succededTrxs = chainData.Addresses[address].Transactions
                             .Where(t => t.Receipt.Succeeded() == true).ToList();
@@ -203,25 +203,25 @@ namespace AnalyzerCore.Services
                             if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
                             {
                                 // Analyze the stats for type of trade
-                                blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}"))
+                                blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                     .ToList();
-                                blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}"))
+                                blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
                                     .ToList();
-                                blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}"))
+                                blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
                                     .ToList();
-                                blockRangeStats.ContP = trxToAnalyze.Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}"))
+                                blockRangeStats.ContP = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
                                     .ToList();
                                 blockRangeStats.T0TrxSucceded = 
-                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T0}"))
+                                    succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                         .ToList();
                                 blockRangeStats.T1TrxSucceded =
-                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T1}"))
+                                    succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
                                         .ToList();
                                 blockRangeStats.T2TrxSucceded =
-                                    succededTrxs.Where(t => t.Input.StartsWith($"0x{OpCodes.T2}"))
+                                    succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
                                         .ToList();
                                 blockRangeStats.ContPSucceded = succededTrxs
-                                    .Where(t => t.Input.StartsWith($"0x{OpCodes.Cont}"))
+                                    .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
                                     .ToList();
                             }
 
