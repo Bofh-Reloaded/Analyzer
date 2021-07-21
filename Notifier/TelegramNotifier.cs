@@ -42,7 +42,6 @@ namespace AnalyzerCore.Notifier
 
         public async void SendStatsRecap(Message message)
         {
-            Log.Debug(JsonSerializer.Serialize(message, new JsonSerializerOptions {WriteIndented = true}));
             var m = new List<string> {message.Timestamp};
             foreach (var a in message.Addresses)
             {
@@ -73,7 +72,7 @@ namespace AnalyzerCore.Notifier
                                 $" B: {s.BlockRange} T: {s.TotalTransactionsPerBlockRange} S: {s.SuccededTranstactionsPerBlockRange} WR: {s.SuccessRate}");
                         }
                     }
-                    catch (System.DivideByZeroException e)
+                    catch (DivideByZeroException e)
                     {
                         Console.WriteLine(e);
                         throw;

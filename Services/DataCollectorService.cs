@@ -62,7 +62,7 @@ namespace AnalyzerCore.Services
             public void GetBlocksAsync(long startBlock, long currentBlock)
             {
                 Parallel.For(startBlock, currentBlock,
-                    new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, b =>
+                    new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async b =>
                     {
                         _log.Debug($"Processing Block: {b.ToString()}");
                         // Initilize null object to be accessible outside try/catch scope
@@ -73,8 +73,12 @@ namespace AnalyzerCore.Services
                         block.Wait();
                         foreach (var e in block.Result.Transactions)
                         {
-                            var enTx = new EnTransaction {Transaction = e, Client = _web3};
-                            enTx.GetReceipt();
+                            var enTx = new EnTransaction
+                            {
+                                Transaction = e,
+                                Receipt = await _web3.Eth.Transactions.GetTransactionReceipt
+                                    .SendRequestAsync(e.TransactionHash)
+                            };
                             // Filling the blocking collection
                             Transactions.Add(enTx);
                         }
@@ -97,16 +101,8 @@ namespace AnalyzerCore.Services
 
             public class EnTransaction
             {
-                public Web3 Client { get; set; }
                 public TransactionReceipt Receipt { get; set; }
-                
                 public Transaction Transaction { get; set; }
-                
-                public async Task GetReceipt()
-                {
-                    Receipt = await Client.Eth.Transactions.GetTransactionReceipt
-                            .SendRequestAsync(Transaction.TransactionHash);
-                }
             }
         }
 

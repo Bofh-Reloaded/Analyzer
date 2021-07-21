@@ -42,13 +42,6 @@ namespace AnalyzerCore
                     var servicesSection = configuration.GetSection("ServicesConfig");
                     var servicesConfig = servicesSection.Get<ServicesConfig>();
 
-                    if (servicesConfig.PlyPendingEnabled)
-                        services.AddSingleton<IHostedService>(
-                            _ => new SubscribedService(
-                                new TelegramNotifier("-532850503"),
-                                "PolygonPending")
-                        );
-
                     if (servicesConfig.PlyEnabled)
                         // Create and add the HostedService for Polygon
                         services.AddSingleton<IHostedService>(

@@ -50,9 +50,9 @@ namespace AnalyzerCore.Services
         public IConfigurationRoot Configuration;
 
         private readonly int _blockDurationTime;
-        
+
         private readonly int _maxParallelism;
-        
+
         private readonly string _ourAddress;
 
         private readonly TokenListConfig _tokenList;
@@ -86,7 +86,7 @@ namespace AnalyzerCore.Services
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");
             _web3 = new Web3(uri);
         }
-        
+
         private async Task AnalyzeMissingTokens(string currentAddress, Task<TransactionReceipt> receipt)
         {
             // Analyze Tokens
@@ -161,7 +161,7 @@ namespace AnalyzerCore.Services
                 var startBlock = new HexBigInteger(currentBlock.Value - NumbersOfBlocksToAnalyze.Max());
 
                 // Get all the transactions inside the blocks between latest and latest - 500
-                chainData.GetBlocksAsync((long)startBlock.Value, (long)currentBlock.Value);
+                chainData.GetBlocksAsync((long) startBlock.Value, (long) currentBlock.Value);
                 _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
 
                 /* Checking succeded transactions */
@@ -182,12 +182,14 @@ namespace AnalyzerCore.Services
 
                         var trxToAnalyze =
                             chainData.Addresses[address]
-                                .Transactions.Where(t => t.Transaction.BlockNumber >= currentBlock.Value - numberOfBlocks)
+                                .Transactions.Where(t =>
+                                    t.Transaction.BlockNumber >= currentBlock.Value - numberOfBlocks)
                                 .ToList();
-                        var succededTrxs = chainData.Addresses[address].Transactions
-                            .Where(t => t.Receipt.Succeeded() == true).ToList();
-
-                            _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
+                        var succededTrxs = trxToAnalyze
+                            .Where(
+                                t => t.Receipt.Succeeded() && t.Receipt.Logs.Count > 0)
+                            .ToList();
+                        _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
 
                         try
                         {
@@ -203,15 +205,19 @@ namespace AnalyzerCore.Services
                             if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
                             {
                                 // Analyze the stats for type of trade
-                                blockRangeStats.T0Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
+                                blockRangeStats.T0Trx = trxToAnalyze
+                                    .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                     .ToList();
-                                blockRangeStats.T1Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
+                                blockRangeStats.T1Trx = trxToAnalyze
+                                    .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
                                     .ToList();
-                                blockRangeStats.T2Trx = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
+                                blockRangeStats.T2Trx = trxToAnalyze
+                                    .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
                                     .ToList();
-                                blockRangeStats.ContP = trxToAnalyze.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
+                                blockRangeStats.ContP = trxToAnalyze.Where(t =>
+                                        t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
                                     .ToList();
-                                blockRangeStats.T0TrxSucceded = 
+                                blockRangeStats.T0TrxSucceded =
                                     succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                         .ToList();
                                 blockRangeStats.T1TrxSucceded =
@@ -249,8 +255,8 @@ namespace AnalyzerCore.Services
                         JsonSerializer.Serialize(_missingTokens), cancellationToken: stoppingToken);
                     await createStream.DisposeAsync();
                 }
-                    
-                    
+
+
                 _missingTokens.Clear();
 
                 await Task.Delay(TaskDelayMs, stoppingToken);
