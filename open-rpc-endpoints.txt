@@ -17,14 +17,6 @@ admin@CF02:~$ geth attach http://162.55.97.217:8545 --exec net.peerCount
 1027
 admin@CF02:~$ geth attach http://162.55.98.218:8545 --exec net.peerCount
 559
-admin@CF02:~$ geth attach http://54.235.54.117:8545 --exec net.peerCount
-727
-admin@CF02:~$ geth attach http://54.89.82.227:8545 --exec net.peerCount
-489
-admin@CF02:~$ geth attach http://65.21.123.100:8545 --exec net.peerCount
-879
-admin@CF02:~$ geth attach http://65.21.131.211:8545 --exec net.peerCount
-773
 
 
 

@@ -20,7 +20,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -41,7 +41,7 @@ namespace AnalyzerCore
                     var analyzerConfig = section.Get<AnalyzerConfig>();
                     var servicesSection = configuration.GetSection("ServicesConfig");
                     var servicesConfig = servicesSection.Get<ServicesConfig>();
-
+/*
                     if (servicesConfig.PlyEnabled)
                         // Create and add the HostedService for Polygon
                         services.AddSingleton<IHostedService>(
@@ -57,23 +57,31 @@ namespace AnalyzerCore
                                 false
                             )
                         );
-
+*/
                     if (servicesConfig.BscEnabled)
-                        // Create and add the HostedService for Binance Smart Chain
+                    {
+                        var bscDataHandler =
+                            new DataCollectorService.ChainDataHandler();
+                        services.AddSingleton<IHostedService>(
+                            _ => new DataCollectorService(
+                                "BinanceSmartChain",
+                                "http://162.55.98.218:8545",
+                                servicesConfig.MaxParallelism,
+                                bscDataHandler
+                            ));
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "BinanceSmartChain",
-                                "http://144.76.94.124:8545",
                                 analyzerConfig.BscEnemies,
                                 new TelegramNotifier(
                                     "-560874043"),
                                 5,
-                                servicesConfig.MaxParallelism,
                                 analyzerConfig.BscAddress,
-                                true
+                                bscDataHandler
                             )
                         );
-
+                    }
+/*
                     if (servicesConfig.HecoEnabled)
                         // Create and add the HostedService for Heco Chain
                         services.AddSingleton<IHostedService>(
@@ -89,6 +97,7 @@ namespace AnalyzerCore
                                 false
                             )
                         );
+                        */
                 });
         }
     }
