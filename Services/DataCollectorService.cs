@@ -14,7 +14,7 @@ namespace AnalyzerCore.Services
         // Define the delay between one cycle and another
         private const int TaskDelayMs = 360000;
 
-        private const int NumberOfBlocksToRetrieve = 2;
+        private const int NumberOfBlocksToRetrieve = 500;
 
         // Initialize Logger
         private static readonly ILog Log = LogManager.GetLogger(

@@ -22,8 +22,6 @@ namespace AnalyzerCore.Services
                 if (!_observers.Contains(observer))
                 {
                     _observers.Add(observer);
-                    // Provide observer with existing data.
-                    observer.OnNext(ChainData);
                 }
 
                 return new Unsubscriber<ChainData>(_observers, observer);

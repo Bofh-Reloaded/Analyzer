@@ -12,7 +12,7 @@ using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Services
 {
-    public class AnalyzerService : BackgroundService, IObserver<DataCollectorService.ChainData>
+    public sealed class AnalyzerService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
         // Define the delay between one cycle and another
         private const int TaskDelayMs = 360000;
@@ -68,11 +68,10 @@ namespace AnalyzerCore.Services
 
         public void OnNext(DataCollectorService.ChainData chainData)
         {
-            // Check if data contains any transaction
-            if (chainData.Transactions.Count <= 0) return;
-
             _log.Info("New Data Received");
-
+            if (chainData == null) return;
+            if (chainData.Transactions.Count <= 0) return;
+            
             var msg = new Message
             {
                 Addresses = new List<AddressStats>(),
@@ -186,12 +185,12 @@ namespace AnalyzerCore.Services
             }
         }
 
-        protected virtual void Subscribe(DataCollectorService.ChainDataHandler provider)
+        private void Subscribe(DataCollectorService.ChainDataHandler provider)
         {
             _cancellation = provider.Subscribe(this);
         }
 
-        protected virtual void Unsubscribe()
+        private void Unsubscribe()
         {
             _cancellation.Dispose();
         }

@@ -20,7 +20,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -63,13 +63,6 @@ namespace AnalyzerCore
                         var bscDataHandler =
                             new DataCollectorService.ChainDataHandler();
                         services.AddSingleton<IHostedService>(
-                            _ => new DataCollectorService(
-                                "BinanceSmartChain",
-                                "http://162.55.98.218:8545",
-                                servicesConfig.MaxParallelism,
-                                bscDataHandler
-                            ));
-                        services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "BinanceSmartChain",
                                 analyzerConfig.BscEnemies,
@@ -80,6 +73,13 @@ namespace AnalyzerCore
                                 bscDataHandler
                             )
                         );
+                        services.AddSingleton<IHostedService>(
+                            _ => new DataCollectorService(
+                                "BinanceSmartChain",
+                                "http://162.55.98.218:8545",
+                                servicesConfig.MaxParallelism,
+                                bscDataHandler
+                            ));
                     }
 /*
                     if (servicesConfig.HecoEnabled)

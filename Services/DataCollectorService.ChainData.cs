@@ -42,40 +42,40 @@ namespace AnalyzerCore.Services
             {
                 var totaltrx = 0;
                 var blockNum = 1;
-                // Parallel.For(startBlock, currentBlock,
-                //     new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async b =>
-                for (var b = startBlock; b <= currentBlock; b++)
-                {
-                    if (cancellationToken.IsCancellationRequested) break;
-                    _log.Debug($"Processing Block: {b.ToString()}");
-                    // Retrieve Transactions inside block X
-                    var blockParameter = new BlockParameter((ulong) b);
-                    var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
-                        .SendRequestAsync(blockParameter);
-                    block.Wait();
-                    Log.Info(
-                        $"Block: {b.ToString()}, iteration: {blockNum.ToString()} total trx: {block.Result.Transactions.Length.ToString()}");
-                    blockNum++;
-                    int txCounter = 0;
-                    foreach (var e in block.Result.Transactions)
+                Parallel.For(startBlock, currentBlock,
+                    new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async b =>
                     {
-                        totaltrx += block.Result.Transactions.Length;
-                        var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
-                            .SendRequestAsync(e.TransactionHash);
-                        txReceipt.Wait();
-                        var enTx = new EnTransaction
+                        _log.Debug($"Processing Block: {b.ToString()}");
+                        // Retrieve Transactions inside block X
+                        var blockParameter = new BlockParameter((ulong) b);
+                        var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
+                            .SendRequestAsync(blockParameter);
+                        block.Wait(cancellationToken);
+                        Log.Debug(
+                            $"Block: {b.ToString()}, iteration: {blockNum.ToString()} total trx: {block.Result.Transactions.Length.ToString()}");
+                        blockNum++;
+                        var txCounter = 0;
+                        Parallel.ForEach(block.Result.Transactions, e =>
                         {
-                            Transaction = e,
-                            TransactionReceipt = txReceipt.Result
-                        };
-                        // Filling the blocking collection
-                        Transactions.Add(enTx);
-                        txCounter++;
-                        _log.Info($" {b.ToString()} -> txCounter: {txCounter}, txHash: {enTx.Transaction.TransactionHash}, receiptStatus: {enTx.TransactionReceipt.Status}");
-                    }
-                }
+                            totaltrx++;
+                            var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
+                                .SendRequestAsync(e.TransactionHash);
+                            txReceipt.Wait(cancellationToken);
+                            var enTx = new EnTransaction
+                            {
+                                Transaction = e,
+                                TransactionReceipt = txReceipt.Result
+                            };
+                            // Filling the blocking collection
+                            Transactions.Add(enTx, cancellationToken);
+                            txCounter++;
+                            _log.Debug(
+                                $" {b.ToString()} -> txCounter: {txCounter.ToString()}, txHash: {enTx.Transaction.TransactionHash}, receiptStatus: {enTx.TransactionReceipt.Status}");
+                        });
+                    });
 
-                _log.Info($"Total trx: {totaltrx.ToString()}");
+                _log.Debug(
+                    $"Total trx: {totaltrx.ToString()} chainData.Transactions: {this.Transactions.Count.ToString()}");
             }
 
             public void GetAddressTransactions(string address)
