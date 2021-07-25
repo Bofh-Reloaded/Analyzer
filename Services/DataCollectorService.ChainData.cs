@@ -21,7 +21,7 @@ namespace AnalyzerCore.Services
             private readonly Web3 _web3;
             public readonly BlockingCollection<EnTransaction> Transactions;
             public readonly Dictionary<string, Address> Addresses;
-            private readonly List<string> _addrs;
+            private readonly List<string> _addressesToAnalyze;
 
 
             public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log, List<string> addresses)
@@ -32,7 +32,7 @@ namespace AnalyzerCore.Services
                 _log = log;
                 Transactions = new BlockingCollection<EnTransaction>();
                 Addresses = new Dictionary<string, Address>();
-                _addrs = addresses;
+                _addressesToAnalyze = addresses;
                 // Reading current last block processed on chain
                 _currentBlock = _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
@@ -44,13 +44,13 @@ namespace AnalyzerCore.Services
             {
                 var totaltrx = 0;
                 var blockNum = 1;
+                BlockParameter blockParameter;
                 Parallel.For(startBlock, currentBlock,
-                    new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async b =>
+                    new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, b =>
                     {
                         // Retrieve Transactions inside block X
-                        var blockParameter = new BlockParameter((ulong) b);
-                        var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
-                            .SendRequestAsync(blockParameter);
+                        blockParameter = new BlockParameter((ulong) b);
+                        using var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
                         block.Wait(cancellationToken);
                         Log.Debug(
                             $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
@@ -59,7 +59,11 @@ namespace AnalyzerCore.Services
                         Parallel.ForEach(block.Result.Transactions, e =>
                         {
                             // Skip if we don't care about the address
-                            if (!_addrs.Contains(e.From) && !_addrs.Contains(e.To)) return;
+                            if (e.To != null &&
+                                e.From != null &&
+                                !_addressesToAnalyze.Contains(e.From.ToLower()) &&
+                                !_addressesToAnalyze.Contains(e.To.ToLower()))
+                                return;
                             totaltrx++;
                             var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
                                 .SendRequestAsync(e.TransactionHash);
@@ -73,7 +77,7 @@ namespace AnalyzerCore.Services
                             Transactions.Add(enTx, cancellationToken);
                             txCounter++;
                             _log.Debug(
-                                $" {b.ToString()} -> txCounter: {txCounter.ToString()}, txHash: {enTx.Transaction.TransactionHash}, receiptStatus: {enTx.TransactionReceipt.Status}");
+                                $"\t{b.ToString()} -> txCounter: {txCounter.ToString()}, txHash: {enTx.Transaction.TransactionHash}, receiptStatus: {enTx.TransactionReceipt.Status}");
                         });
                     });
 
@@ -86,8 +90,8 @@ namespace AnalyzerCore.Services
                 Addresses[address] = new Address
                 {
                     Transactions = Transactions.Where(t =>
-                            TransactionExtensions.IsFrom(t.Transaction, address) ||
-                            TransactionExtensions.IsTo(t.Transaction, address))
+                            t.Transaction.IsFrom(address) ||
+                            t.Transaction.IsTo(address))
                         .ToList()
                 };
             }
