@@ -78,6 +78,13 @@ namespace AnalyzerCore
                             )
                         );
                         services.AddSingleton<IHostedService>(
+                            _ => new TokenObserverService(
+                                chainName: "BinanceSmartChain",
+                                telegramNotifier: new TelegramNotifier(
+                                    "-560874043"),
+                                chainDataHandler: bscDataHandler)
+                        );
+                        services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "BinanceSmartChain",
                                 "http://162.55.98.218:8545",

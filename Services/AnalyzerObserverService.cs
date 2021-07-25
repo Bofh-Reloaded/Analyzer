@@ -50,7 +50,7 @@ namespace AnalyzerCore.Services
             _telegramNotifier = telegramNotifier ?? throw new ArgumentNullException(nameof(telegramNotifier));
             _blockDurationTime = blockDurationTime;
             _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
-            _addresses.Add(ourAddress);
+            //_addresses.Add(ourAddress);
             _chainDataHandler = chainDataHandler;
 
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");

@@ -22,12 +22,13 @@ namespace AnalyzerCore.Services
             MethodBase.GetCurrentMethod()?.DeclaringType
         );
 
+        private readonly List<string> _addresses;
+        private readonly ChainDataHandler _chainDataHandler;
+        private readonly string _chainName;
+
         private readonly int _maxParallelism;
 
         private readonly Web3 _web3;
-        private readonly string _chainName;
-        private readonly ChainDataHandler _chainDataHandler;
-        private readonly List<string> _addresses;
 
         public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler, List<string> addresses)
         {

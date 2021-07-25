@@ -14,19 +14,19 @@ namespace AnalyzerCore.Services
     {
         public class ChainData
         {
+            private readonly List<string> _addressesToAnalyze;
             private readonly string _chainName;
             private readonly Task<HexBigInteger> _currentBlock;
             private readonly ILog _log;
             private readonly int _maxParallelism;
-            private readonly Web3 _web3;
-            public readonly BlockingCollection<EnTransaction> Transactions;
             public readonly Dictionary<string, Address> Addresses;
-            private readonly List<string> _addressesToAnalyze;
+            public readonly BlockingCollection<EnTransaction> Transactions;
+            public readonly Web3 Web3;
 
 
             public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log, List<string> addresses)
             {
-                _web3 = web3;
+                Web3 = web3;
                 _chainName = chainName;
                 _maxParallelism = maxParallelism;
                 _log = log;
@@ -34,7 +34,7 @@ namespace AnalyzerCore.Services
                 Addresses = new Dictionary<string, Address>();
                 _addressesToAnalyze = addresses;
                 // Reading current last block processed on chain
-                _currentBlock = _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+                _currentBlock = Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
             }
 
@@ -50,7 +50,7 @@ namespace AnalyzerCore.Services
                     {
                         // Retrieve Transactions inside block X
                         blockParameter = new BlockParameter((ulong) b);
-                        using var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
+                        using var block = Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
                         block.Wait(cancellationToken);
                         Log.Debug(
                             $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
@@ -65,7 +65,7 @@ namespace AnalyzerCore.Services
                                 !_addressesToAnalyze.Contains(e.To.ToLower()))
                                 return;
                             totaltrx++;
-                            var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
+                            var txReceipt = Web3.Eth.Transactions.GetTransactionReceipt
                                 .SendRequestAsync(e.TransactionHash);
                             txReceipt.Wait(cancellationToken);
                             var enTx = new EnTransaction
