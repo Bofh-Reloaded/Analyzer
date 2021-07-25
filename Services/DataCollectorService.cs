@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -26,8 +27,9 @@ namespace AnalyzerCore.Services
         private readonly Web3 _web3;
         private readonly string _chainName;
         private readonly ChainDataHandler _chainDataHandler;
+        private readonly List<string> _addresses;
 
-        public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler)
+        public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler, List<string> addresses)
         {
             _chainName = chainName;
             _maxParallelism = maxParallelism;
@@ -35,6 +37,7 @@ namespace AnalyzerCore.Services
             // Registering Web3 client endpoint
             Log.Info($"DataCollectorService Initialized for chain: {chainName}");
             _web3 = new Web3(uri);
+            _addresses = addresses;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -44,7 +47,7 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 Log.Info($"Starting a new cycle for chain: {_chainName}");
-                var chainData = new ChainData(_web3, _chainName, _maxParallelism, Log);
+                var chainData = new ChainData(_web3, _chainName, _maxParallelism, Log, _addresses);
                 var currentBlock = chainData.CurrentBlock;
                 Log.Info($"Processing Blocks: {NumberOfBlocksToRetrieve.ToString()}");
                 var startBlock = new HexBigInteger(currentBlock.Value - NumberOfBlocksToRetrieve);

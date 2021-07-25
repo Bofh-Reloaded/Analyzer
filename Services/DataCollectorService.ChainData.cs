@@ -21,9 +21,10 @@ namespace AnalyzerCore.Services
             private readonly Web3 _web3;
             public readonly BlockingCollection<EnTransaction> Transactions;
             public readonly Dictionary<string, Address> Addresses;
+            private readonly List<string> _addrs;
 
 
-            public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log)
+            public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log, List<string> addresses)
             {
                 _web3 = web3;
                 _chainName = chainName;
@@ -31,6 +32,7 @@ namespace AnalyzerCore.Services
                 _log = log;
                 Transactions = new BlockingCollection<EnTransaction>();
                 Addresses = new Dictionary<string, Address>();
+                _addrs = addresses;
                 // Reading current last block processed on chain
                 _currentBlock = _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
@@ -45,18 +47,19 @@ namespace AnalyzerCore.Services
                 Parallel.For(startBlock, currentBlock,
                     new ParallelOptions {MaxDegreeOfParallelism = _maxParallelism}, async b =>
                     {
-                        _log.Debug($"Processing Block: {b.ToString()}");
                         // Retrieve Transactions inside block X
                         var blockParameter = new BlockParameter((ulong) b);
                         var block = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
                             .SendRequestAsync(blockParameter);
                         block.Wait(cancellationToken);
                         Log.Debug(
-                            $"Block: {b.ToString()}, iteration: {blockNum.ToString()} total trx: {block.Result.Transactions.Length.ToString()}");
+                            $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
                         blockNum++;
                         var txCounter = 0;
                         Parallel.ForEach(block.Result.Transactions, e =>
                         {
+                            // Skip if we don't care about the address
+                            if (!_addrs.Contains(e.From) && !_addrs.Contains(e.To)) return;
                             totaltrx++;
                             var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
                                 .SendRequestAsync(e.TransactionHash);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
@@ -60,6 +61,9 @@ namespace AnalyzerCore
 */
                     if (servicesConfig.BscEnabled)
                     {
+                        // Temporary fix to get only our addresses
+                        var allAddresses = analyzerConfig.BscEnemies;
+                        allAddresses.Add(analyzerConfig.BscAddress);
                         var bscDataHandler =
                             new DataCollectorService.ChainDataHandler();
                         services.AddSingleton<IHostedService>(
@@ -78,7 +82,8 @@ namespace AnalyzerCore
                                 "BinanceSmartChain",
                                 "http://162.55.98.218:8545",
                                 servicesConfig.MaxParallelism,
-                                bscDataHandler
+                                bscDataHandler,
+                                allAddresses
                             ));
                     }
 /*
