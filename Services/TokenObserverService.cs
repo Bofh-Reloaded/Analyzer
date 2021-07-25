@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,7 +18,7 @@ namespace AnalyzerCore.Services
         private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
         private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
-        private const int TaskDelayMs = 360000;
+        private const int TaskDelayMs = 60000;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
 
@@ -26,7 +27,7 @@ namespace AnalyzerCore.Services
             MethodBase.GetCurrentMethod()?.DeclaringType
         );
 
-        private readonly List<MissingToken> _missingTokens;
+        private readonly BlockingCollection<MissingToken> _missingTokens;
         private readonly TelegramNotifier _telegramNotifier;
 
         private readonly TokenListConfig _tokenList;
@@ -47,7 +48,7 @@ namespace AnalyzerCore.Services
                 .AddJsonFile("tokens.json", false, true)
                 .Build();
             _tokenList = configuration.Get<TokenListConfig>();
-            _missingTokens = new List<MissingToken>();
+            _missingTokens = new BlockingCollection<MissingToken>();
         }
 
         public void OnCompleted()
@@ -95,6 +96,19 @@ namespace AnalyzerCore.Services
             _log.Info("Analysis complete");
         }
 
+        private void NotifyMissingTokens()
+        {
+            if (_missingTokens.Count <= 0) return;
+            _telegramNotifier.SendMessage(
+                string.Join(
+                    Environment.NewLine,
+                    _missingTokens
+                        .Select(t => t.TokenAddress)
+                        .ToArray()
+                ));
+            while (_missingTokens.TryTake(out _)){}
+        }
+
         private void EvaluateToken(string token, string txHash, string factory)
         {
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
@@ -124,6 +138,7 @@ namespace AnalyzerCore.Services
             {
                 Subscribe(_chainDataHandler);
                 await Task.Delay(TaskDelayMs, stoppingToken);
+                NotifyMissingTokens();
             }
         }
 
