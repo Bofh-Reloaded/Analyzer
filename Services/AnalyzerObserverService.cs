@@ -18,7 +18,7 @@ namespace AnalyzerCore.Services
         private const int TaskDelayMs = 360000;
 
         // Array of block to analyze
-        private static readonly List<int> NumbersOfBlocksToAnalyze = new() {25, 100, 500};
+        private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() {25, 100, 500};
 
         // Initialize an empty list of string that will be filled with addresses
         private readonly List<string> _addresses;
