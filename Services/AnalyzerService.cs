@@ -188,14 +188,7 @@ namespace AnalyzerCore.Services
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                _log.Info("New Analsys Cycle");
-
-                var msg = new Message
-                {
-                    Addresses = new List<AddressStats>(),
-                    Timestamp =
-                        $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550</b>"
-                };
+                _log.Info("New Analysis Cycle");
 
                 // Get Current Block
                 var currentBlock = await GetCurrentBlock();
@@ -207,6 +200,13 @@ namespace AnalyzerCore.Services
                 }
 
                 var startBlock = new HexBigInteger(currentBlock.Value - NumbersOfBlocksToAnalyze.Max());
+                
+                var msg = new Message
+                {
+                    Addresses = new List<AddressStats>(),
+                    Timestamp =
+                        $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 From Block: {startBlock}, To Current Block: {currentBlock}</b>"
+                };
 
                 // Get all the transactions inside the blocks between latest and latest - 500
                 var trx = GetBlocksAsync(startBlock, currentBlock);
