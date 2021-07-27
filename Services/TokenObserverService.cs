@@ -92,8 +92,12 @@ namespace AnalyzerCore.Services
                         await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
                     var token0 = token0OutputDto.ReturnValue1;
                     var token1 = token1OutputDto.ReturnValue1;
-                    EvaluateToken(token0, t.Transaction.TransactionHash, poolFactory);
-                    EvaluateToken(token1, t.Transaction.TransactionHash, poolFactory);
+                    var token0ContractHandler = chainData.Web3.Eth.GetContractHandler(token0);
+                    var token1ContractHandler = chainData.Web3.Eth.GetContractHandler(token1);
+                    var token0Symbol = await token0ContractHandler.QueryAsync<SymbolFunction, string>();
+                    var token1Symbol = await token1ContractHandler.QueryAsync<SymbolFunction, string>();
+                    EvaluateToken(token0, token0Symbol, t.Transaction.TransactionHash, poolFactory);
+                    EvaluateToken(token1, token1Symbol, t.Transaction.TransactionHash, poolFactory);
                 }
             });
             _log.Info("Analysis complete");
@@ -105,14 +109,12 @@ namespace AnalyzerCore.Services
             _telegramNotifier.SendMessage(
                 string.Join(
                     Environment.NewLine,
-                    _missingTokens
-                        .Select(t => t.TokenAddress)
-                        .ToArray()
+                    _missingTokens.Select(t => $"{t.TokenSymbol}: {t.TokenAddress}")
                 ));
             while (_missingTokens.TryTake(out _)){}
         }
 
-        private void EvaluateToken(string token, string txHash, string factory)
+        private void EvaluateToken(string token, string tokenSymbol, string txHash, string factory)
         {
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
             if ((_missingTokens.Where(m => m.TokenAddress == token)).Any()) return;
@@ -122,7 +124,8 @@ namespace AnalyzerCore.Services
             {
                 PoolFactory = factory,
                 TokenAddress = token,
-                TransactionHash = txHash
+                TransactionHash = txHash,
+                TokenSymbol = tokenSymbol
             });
         }
 
@@ -198,7 +201,6 @@ namespace AnalyzerCore.Services
                 // Check the difference
                 return totalSupplyT1 < totalSupplyT0;
             }
-
         }
     }
 }

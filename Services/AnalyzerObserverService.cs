@@ -71,15 +71,15 @@ namespace AnalyzerCore.Services
             _log.Info("New Data Received");
             if (chainData == null) return;
             if (chainData.Transactions.Count <= 0) return;
+
+            _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
             
             var msg = new Message
             {
                 Addresses = new List<AddressStats>(),
                 Timestamp =
-                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550</b>"
+                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 To Current Block: {chainData.CurrentBlock}</b>"
             };
-
-            _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
 
             /* Checking succeded transactions */
             foreach (var address in _addresses)

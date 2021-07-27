@@ -124,3 +124,11 @@ public class TransferEventDTOBase : IEventDTO
     [Parameter("uint256", "_value", 3, false)]
     public virtual BigInteger Value { get; set; }
 }
+
+public partial class SymbolFunction : SymbolFunctionBase { }
+
+[Function("symbol", "string")]
+public class SymbolFunctionBase : FunctionMessage
+{
+
+}

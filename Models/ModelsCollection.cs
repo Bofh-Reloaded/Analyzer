@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using AnalyzerCore.Services;
 using Nethereum.RPC.Eth.DTOs;
+using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models
 {
@@ -47,8 +48,11 @@ namespace AnalyzerCore.Models
 
     public class MissingToken
     {
+        [JsonProperty]
         public string TokenAddress { get; set; }
         public string TransactionHash { get; set; }
         public string PoolFactory { get; set; }
+        [JsonProperty]
+        public string TokenSymbol { get; set; }
     }
 }
