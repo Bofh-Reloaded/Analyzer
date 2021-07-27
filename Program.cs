@@ -70,7 +70,7 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "BinanceSmartChain",
-                                "http://116.203.223.143:8545",
+                                "http://13.250.53.181:8545",
                                 analyzerConfig.BscEnemies,
                                 new TelegramNotifier(
                                     "-560874043"),
