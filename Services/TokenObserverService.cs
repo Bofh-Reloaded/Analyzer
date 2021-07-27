@@ -1,8 +1,10 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +12,8 @@ using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
+using Nethereum.Contracts;
+using Nethereum.JsonRpc.WebSocketStreamingClient;
 
 namespace AnalyzerCore.Services
 {
@@ -31,10 +35,10 @@ namespace AnalyzerCore.Services
         private readonly TelegramNotifier _telegramNotifier;
 
         private readonly TokenListConfig _tokenList;
-        private IDisposable _cancellation;
+        private IDisposable? _cancellation;
 
         // Initialize configuration accessor
-        public IConfigurationRoot Configuration;
+        public IConfigurationRoot? Configuration;
 
         public TokenObserverService(string chainName, TelegramNotifier telegramNotifier,
             DataCollectorService.ChainDataHandler chainDataHandler)
@@ -64,7 +68,6 @@ namespace AnalyzerCore.Services
         public void OnNext(DataCollectorService.ChainData chainData)
         {
             _log.Info("New Data Received");
-            if (chainData == null) return;
             if (chainData.Transactions.Count <= 0) return;
 
             // Select only transaction from the address that we need analyze
@@ -149,7 +152,53 @@ namespace AnalyzerCore.Services
 
         private void Unsubscribe()
         {
-            _cancellation.Dispose();
+            _cancellation?.Dispose();
+        }
+
+        public interface IDeflationaryChecker
+        {
+            public List<string> TokensToCheck { get; set; }
+            public string ChainName { get; set; }
+            private void CheckToken(string token)
+            {
+            }
+        }
+        public class DeflationaryChecker: IDeflationaryChecker
+        {
+            public List<string> TokensToCheck { get; set; } = null!;
+            public string ChainName { get; set; } = null!;
+            private readonly string _fileName = null!;
+            private DataCollectorService.ChainData _chainData;
+
+            public DeflationaryChecker(List<string> tokensToCheck, string? chainName, DataCollectorService.ChainData chainData)
+            {
+                TokensToCheck = tokensToCheck;
+                _chainData = chainData;
+                if (chainName != null) ChainName = chainName;
+            }
+
+            public DeflationaryChecker(string fileName, string? chainName, DataCollectorService.ChainData chainData)
+            {
+                _fileName = fileName;
+                _chainData = chainData;
+                if (chainName != null) ChainName = chainName;
+            }
+
+            private async Task<bool> IsTokenDeflationary(string token)
+            {
+                var contractHandler = _chainData.Web3.Eth.GetContractHandler(token);
+                // Read the total supply at T0
+                var totalSupplyT0 = await contractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                // Wait for n transaction
+                var client = new StreamingWebSocketClient("");
+                var filterTransfers = Event<TransferEventDTO>.GetEventABI().CreateFilterInput();
+
+                // Read the total supply at T1
+                var totalSupplyT1 = await contractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                // Check the difference
+                return totalSupplyT1 < totalSupplyT0;
+            }
+
         }
     }
 }

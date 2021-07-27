@@ -27,7 +27,7 @@ namespace AnalyzerCore.Services
             public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log, List<string> addresses)
             {
                 Web3 = web3;
-                _chainName = chainName;
+                if (chainName != null) _chainName = chainName;
                 _maxParallelism = maxParallelism;
                 _log = log;
                 Transactions = new BlockingCollection<EnTransaction>();
