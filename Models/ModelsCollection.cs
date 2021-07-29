@@ -46,7 +46,7 @@ namespace AnalyzerCore.Models
         public string ourAddress { get; internal set; }
     }
 
-    public class MissingToken
+    public class Token
     {
         [JsonProperty]
         public string TokenAddress { get; set; }
@@ -54,5 +54,9 @@ namespace AnalyzerCore.Models
         public string PoolFactory { get; set; }
         [JsonProperty]
         public string TokenSymbol { get; set; }
+        [JsonProperty]
+        public string TokenTotalSupply { get; set; }
+
+        public bool IsDeflationary { get; set; }
     }
 }

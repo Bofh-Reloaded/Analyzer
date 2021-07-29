@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,14 +30,23 @@ namespace AnalyzerCore.Services
 
         private readonly Web3 _web3;
 
-        public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler, List<string> addresses)
+        public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler,
+            List<string> addresses)
         {
             _chainName = chainName;
             _maxParallelism = maxParallelism;
             _chainDataHandler = chainDataHandler;
             // Registering Web3 client endpoint
             Log.Info($"DataCollectorService Initialized for chain: {chainName}");
-            _web3 = new Web3(uri);
+            try
+            {
+                _web3 = new Web3(uri);
+            }
+            catch
+            {
+                Log.Error($"Cannot connect to RPC: {uri}.");
+            }
+            
             _addresses = addresses;
         }
 
@@ -46,7 +57,19 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 Log.Info($"Starting a new cycle for chain: {_chainName}");
-                var chainData = new ChainData(_web3, _chainName, _maxParallelism, Log, _addresses);
+                ChainData chainData = null;
+                try
+                {
+                    chainData = new ChainData(_web3, _chainName, _maxParallelism, Log, _addresses);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("Cannot Connect to RPC Server");
+                    await StopAsync(cancellationToken: stoppingToken);
+                    return;
+                }
+
+                Debug.Assert(chainData != null, nameof(chainData) + " != null");
                 var currentBlock = chainData.CurrentBlock;
                 Log.Info($"Processing Blocks: {NumberOfBlocksToRetrieve.ToString()}");
                 var startBlock = new HexBigInteger(currentBlock.Value - NumberOfBlocksToRetrieve);

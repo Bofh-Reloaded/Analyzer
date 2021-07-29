@@ -12,8 +12,7 @@ using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
-using Nethereum.Contracts;
-using Nethereum.JsonRpc.WebSocketStreamingClient;
+using Org.BouncyCastle.Crypto.Engines;
 
 namespace AnalyzerCore.Services
 {
@@ -31,7 +30,7 @@ namespace AnalyzerCore.Services
             MethodBase.GetCurrentMethod()?.DeclaringType
         );
 
-        private readonly BlockingCollection<MissingToken> _missingTokens;
+        private readonly BlockingCollection<Token> _missingTokens;
         private readonly TelegramNotifier _telegramNotifier;
 
         private readonly TokenListConfig _tokenList;
@@ -52,7 +51,7 @@ namespace AnalyzerCore.Services
                 .AddJsonFile("tokens.json", false, true)
                 .Build();
             _tokenList = configuration.Get<TokenListConfig>();
-            _missingTokens = new BlockingCollection<MissingToken>();
+            _missingTokens = new BlockingCollection<Token>();
         }
 
         public void OnCompleted()
@@ -90,14 +89,13 @@ namespace AnalyzerCore.Services
                     var poolFactory = await contractHandler.QueryAsync<FactoryFunction, string>();
                     var token1OutputDto =
                         await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                    var token0 = token0OutputDto.ReturnValue1;
-                    var token1 = token1OutputDto.ReturnValue1;
-                    var token0ContractHandler = chainData.Web3.Eth.GetContractHandler(token0);
-                    var token1ContractHandler = chainData.Web3.Eth.GetContractHandler(token1);
-                    var token0Symbol = await token0ContractHandler.QueryAsync<SymbolFunction, string>();
-                    var token1Symbol = await token1ContractHandler.QueryAsync<SymbolFunction, string>();
-                    EvaluateToken(token0, token0Symbol, t.Transaction.TransactionHash, poolFactory);
-                    EvaluateToken(token1, token1Symbol, t.Transaction.TransactionHash, poolFactory);
+                    foreach (var token in new List<string> {token0OutputDto.ReturnValue1, token1OutputDto.ReturnValue1})
+                    {
+                        var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
+                        var tokenSymbol = await tokenContractHandler.QueryAsync<SymbolFunction, string>();
+                        var tokenTotalSupply = await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                        EvaluateToken(token, tokenSymbol, tokenTotalSupply, t.Transaction.TransactionHash, poolFactory);
+                    }
                 }
             });
             _log.Info("Analysis complete");
@@ -109,23 +107,29 @@ namespace AnalyzerCore.Services
             _telegramNotifier.SendMessage(
                 string.Join(
                     Environment.NewLine,
-                    _missingTokens.Select(t => $"{t.TokenSymbol}: {t.TokenAddress}")
+                    _missingTokens.Select(t => $"{t.TokenSymbol}: {t.TokenAddress}, totalSupply: {t.TokenTotalSupply.ToString()}, isDeflationary: {t.IsDeflationary.ToString()}")
                 ));
             while (_missingTokens.TryTake(out _)){}
         }
 
-        private void EvaluateToken(string token, string tokenSymbol, string txHash, string factory)
+        private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash, string factory)
         {
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
             if ((_missingTokens.Where(m => m.TokenAddress == token)).Any()) return;
             _log.Info(
                 $"Found missing Token: {token} with TxHash: {txHash} within Exchange: {factory}");
-            _missingTokens.Add(new MissingToken()
+            var isDeflationary = _missingTokens.Where(t => t.TokenAddress == token)
+                                     .Select(t => t.TokenTotalSupply)
+                                     .ToString() !=
+                                 tokenTotalSupply.ToString();
+            _missingTokens.Add(new Token()
             {
                 PoolFactory = factory,
                 TokenAddress = token,
                 TransactionHash = txHash,
-                TokenSymbol = tokenSymbol
+                TokenSymbol = tokenSymbol,
+                TokenTotalSupply = tokenTotalSupply.ToString(),
+                IsDeflationary = isDeflationary
             });
         }
 
@@ -156,51 +160,6 @@ namespace AnalyzerCore.Services
         private void Unsubscribe()
         {
             _cancellation?.Dispose();
-        }
-
-        public interface IDeflationaryChecker
-        {
-            public List<string> TokensToCheck { get; set; }
-            public string ChainName { get; set; }
-            private void CheckToken(string token)
-            {
-            }
-        }
-        public class DeflationaryChecker: IDeflationaryChecker
-        {
-            public List<string> TokensToCheck { get; set; } = null!;
-            public string ChainName { get; set; } = null!;
-            private readonly string _fileName = null!;
-            private DataCollectorService.ChainData _chainData;
-
-            public DeflationaryChecker(List<string> tokensToCheck, string? chainName, DataCollectorService.ChainData chainData)
-            {
-                TokensToCheck = tokensToCheck;
-                _chainData = chainData;
-                if (chainName != null) ChainName = chainName;
-            }
-
-            public DeflationaryChecker(string fileName, string? chainName, DataCollectorService.ChainData chainData)
-            {
-                _fileName = fileName;
-                _chainData = chainData;
-                if (chainName != null) ChainName = chainName;
-            }
-
-            private async Task<bool> IsTokenDeflationary(string token)
-            {
-                var contractHandler = _chainData.Web3.Eth.GetContractHandler(token);
-                // Read the total supply at T0
-                var totalSupplyT0 = await contractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                // Wait for n transaction
-                var client = new StreamingWebSocketClient("");
-                var filterTransfers = Event<TransferEventDTO>.GetEventABI().CreateFilterInput();
-
-                // Read the total supply at T1
-                var totalSupplyT1 = await contractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                // Check the difference
-                return totalSupplyT1 < totalSupplyT0;
-            }
         }
     }
 }
