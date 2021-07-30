@@ -121,7 +121,6 @@ namespace AnalyzerCore.Services
         private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash, string factory)
         {
             if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
-            var isDeflationary = false;
             // Check if the token is already in the list
             if (_missingTokens.ContainsKey(token))
             {
@@ -129,7 +128,7 @@ namespace AnalyzerCore.Services
                 if (_missingTokens[token].TokenTotalSupply != tokenTotalSupply.ToString())
                 {
                     _log.Info($"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply} to {tokenTotalSupply.ToString()}");
-                    isDeflationary = true;
+                    _missingTokens[token].IsDeflationary = true;
                 }
                 // Update token details, maybe this is not needed but anyway...
                 _missingTokens[token].TransactionHash = txHash;
@@ -138,6 +137,7 @@ namespace AnalyzerCore.Services
             }
             else
             {
+                // Create the object inside the dictionary since it's the first time that we see it
                 _missingTokens[token] = new Token
                 {
                     PoolFactory = factory,
@@ -145,7 +145,7 @@ namespace AnalyzerCore.Services
                     TransactionHash = txHash,
                     TokenSymbol = tokenSymbol,
                     TokenTotalSupply = tokenTotalSupply.ToString(),
-                    IsDeflationary = isDeflationary,
+                    IsDeflationary = false,
                     TxCount = 1
                 };
             }
