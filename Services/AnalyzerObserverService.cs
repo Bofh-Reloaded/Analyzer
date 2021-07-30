@@ -160,9 +160,9 @@ namespace AnalyzerCore.Services
             }
 
             msg.TotalTrx = chainData.Transactions.Count;
-            msg.TPS = chainData.Transactions.Count / _blockDurationTime;
+            msg.Tps = chainData.Transactions.Count / _blockDurationTime;
 
-            msg.ourAddress = _ourAddress;
+            msg.OurAddress = _ourAddress;
 
             _telegramNotifier.SendStatsRecap(msg);
         }

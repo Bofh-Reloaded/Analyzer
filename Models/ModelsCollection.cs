@@ -41,9 +41,9 @@ namespace AnalyzerCore.Models
     {
         public string Timestamp { get; set; }
         public List<AddressStats> Addresses { get; set; }
-        public int TPS { get; set; }
+        public int Tps { get; set; }
         public int TotalTrx { get; internal set; }
-        public string ourAddress { get; internal set; }
+        public string OurAddress { get; internal set; }
     }
 
     public class Token
@@ -56,7 +56,7 @@ namespace AnalyzerCore.Models
         public string TokenSymbol { get; set; }
         [JsonProperty]
         public string TokenTotalSupply { get; set; }
-
         public bool IsDeflationary { get; set; }
+        public int TxCount { get; set; }
     }
 }

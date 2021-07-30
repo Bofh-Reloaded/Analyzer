@@ -49,7 +49,7 @@ namespace AnalyzerCore.Notifier
                 foreach (var s in a.BlockRanges)
                     try
                     {
-                        if (string.Equals(a.Address, message.ourAddress, StringComparison.CurrentCultureIgnoreCase))
+                        if (string.Equals(a.Address, message.OurAddress, StringComparison.CurrentCultureIgnoreCase))
                         {
                             m.Add(
                                 $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
@@ -79,7 +79,7 @@ namespace AnalyzerCore.Notifier
                     }
             }
 
-            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.TPS}\U0001F4CA");
+            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.Tps}\U0001F4CA");
             var _ = await _bot.SendTextMessageAsync(
                 _chatId,
                 Join(Environment.NewLine, m.ToArray()),
