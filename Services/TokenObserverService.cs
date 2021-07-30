@@ -8,12 +8,10 @@ using System.Numerics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
-using Nethereum.Model;
 
 namespace AnalyzerCore.Services
 {
@@ -34,11 +32,11 @@ namespace AnalyzerCore.Services
         private readonly ConcurrentDictionary<string, Token> _missingTokens;
         private readonly TelegramNotifier _telegramNotifier;
 
-        private readonly TokenListConfig _tokenList;
+        private TokenListConfig _tokenList;
         private IDisposable? _cancellation;
 
         // Initialize configuration accessor
-        public IConfigurationRoot? Configuration;
+        private readonly IConfigurationRoot? _configuration;
 
         public TokenObserverService(string chainName, TelegramNotifier telegramNotifier,
             DataCollectorService.ChainDataHandler chainDataHandler)
@@ -47,11 +45,11 @@ namespace AnalyzerCore.Services
             _telegramNotifier = telegramNotifier;
             _chainDataHandler = chainDataHandler;
             // Load configuration regarding tokens
-            IConfiguration configuration = new ConfigurationBuilder()
+            _configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("tokens.json", false, true)
                 .Build();
-            _tokenList = configuration.Get<TokenListConfig>();
+            _tokenList = _configuration.Get<TokenListConfig>();
             _missingTokens = new ConcurrentDictionary<string, Token>();
         }
 
@@ -69,6 +67,7 @@ namespace AnalyzerCore.Services
         {
             _log.Info("New Data Received");
             if (chainData.Transactions.Count <= 0) return;
+            _tokenList = _configuration.Get<TokenListConfig>();
 
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
@@ -125,14 +124,14 @@ namespace AnalyzerCore.Services
             if (_missingTokens.ContainsKey(token))
             {
                 // Token exists, check if the supply is changed
-                if (_missingTokens[token].TokenTotalSupply != tokenTotalSupply.ToString())
+                if (tokenTotalSupply < _missingTokens[token].TokenTotalSupply)
                 {
-                    _log.Info($"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply} to {tokenTotalSupply.ToString()}");
+                    _log.Info($"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
                     _missingTokens[token].IsDeflationary = true;
                 }
                 // Update token details, maybe this is not needed but anyway...
                 _missingTokens[token].TransactionHash = txHash;
-                _missingTokens[token].TokenTotalSupply = tokenTotalSupply.ToString();
+                _missingTokens[token].TokenTotalSupply = tokenTotalSupply;
                 _missingTokens[token].TxCount++;
             }
             else
@@ -144,7 +143,7 @@ namespace AnalyzerCore.Services
                     TokenAddress = token,
                     TransactionHash = txHash,
                     TokenSymbol = tokenSymbol,
-                    TokenTotalSupply = tokenTotalSupply.ToString(),
+                    TokenTotalSupply = tokenTotalSupply,
                     IsDeflationary = false,
                     TxCount = 1
                 };

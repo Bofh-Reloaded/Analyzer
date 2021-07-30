@@ -32,12 +32,20 @@ namespace AnalyzerCore.Notifier
 
         public async void SendMessage(string text)
         {
-            Log.Debug(text);
-            await _bot.SendTextMessageAsync(
-                _chatId,
-                text,
-                ParseMode.Html
-            );
+
+            try
+            {
+                Log.Debug(text);
+                await _bot.SendTextMessageAsync(
+                    _chatId,
+                    text,
+                    ParseMode.Html
+                );
+            }
+            catch (Exception)
+            {
+                Log.Error("Message too long?");
+            }
         }
 
         public async void SendStatsRecap(Message message)

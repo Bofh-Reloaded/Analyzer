@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Numerics;
 using AnalyzerCore.Services;
 using Nethereum.RPC.Eth.DTOs;
 using Newtonsoft.Json;
@@ -55,7 +56,7 @@ namespace AnalyzerCore.Models
         [JsonProperty]
         public string TokenSymbol { get; set; }
         [JsonProperty]
-        public string TokenTotalSupply { get; set; }
+        public BigInteger TokenTotalSupply { get; set; }
         public bool IsDeflationary { get; set; }
         public int TxCount { get; set; }
     }
