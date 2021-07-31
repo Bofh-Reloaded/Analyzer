@@ -113,7 +113,7 @@ namespace AnalyzerCore.Services
                     _missingTokens.Values
                         .ToList()
                         .OrderBy(o=>o.TxCount)
-                        .Select(t => $"<b>{t.TokenSymbol}:</b>{Environment.NewLine}  token: {t.TokenAddress}{Environment.NewLine}  totalSupply: {t.TokenTotalSupply.ToString()}{Environment.NewLine}  isDeflationary: {t.IsDeflationary.ToString()}{Environment.NewLine}  totalTxCount: {t.TxCount.ToString()}")
+                        .Select(t => $"<b>{t.TokenSymbol}:</b>{Environment.NewLine}  token: {t.TokenAddress}{Environment.NewLine}  isDeflationary: {t.IsDeflationary.ToString()}{Environment.NewLine}  totalTxCount: {t.TxCount.ToString()}")
                 ));
         }
 
