@@ -112,8 +112,8 @@ namespace AnalyzerCore.Services
                     Environment.NewLine,
                     _missingTokens.Values
                         .ToList()
-                        .TakeLast(10)
                         .OrderBy(o=>o.TxCount)
+                        .TakeLast(10)
                         .Select(
                             t => $"<b>{t.TokenSymbol}:</b>{Environment.NewLine}  token: {t.TokenAddress}{Environment.NewLine}  isDeflationary: {t.IsDeflationary.ToString()}{Environment.NewLine}  totalTxCount: {t.TxCount.ToString()}{Environment.NewLine}  lastTxSeen: {t.TransactionHash}"
                             )
