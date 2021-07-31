@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Net;
 using System.Numerics;
 using AnalyzerCore.Services;
 using Nethereum.RPC.Eth.DTOs;
@@ -52,6 +53,11 @@ namespace AnalyzerCore.Models
         [JsonProperty]
         public string TokenAddress { get; set; }
         public string TransactionHash { get; set; }
+
+        public string GetTransactionHash()
+        {
+            return $"<a href='https://bscscan.com/tx/{TransactionHash}'>txHash</a>";
+        }
         public string PoolFactory { get; set; }
         [JsonProperty]
         public string TokenSymbol { get; set; }

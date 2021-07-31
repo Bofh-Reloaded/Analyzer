@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text.Json;
 using log4net;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -39,7 +38,8 @@ namespace AnalyzerCore.Notifier
                 await _bot.SendTextMessageAsync(
                     _chatId,
                     text,
-                    ParseMode.Html
+                    ParseMode.Html,
+                    disableWebPagePreview: true
                 );
             }
             catch (Exception)
