@@ -99,7 +99,7 @@ namespace AnalyzerCore
                         // Temporary fix to get only our addresses
                         var allAddresses = analyzerConfig.HecoEnemies;
                         allAddresses.Add(analyzerConfig.HecoAddress);
-                        var bscDataHandler =
+                        var hecoDataHandler =
                             new DataCollectorService.ChainDataHandler();
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
@@ -109,15 +109,22 @@ namespace AnalyzerCore
                                     "-516536036"),
                                 5,
                                 analyzerConfig.HecoAddress,
-                                bscDataHandler
+                                hecoDataHandler
                             )
+                        );
+                        services.AddSingleton<IHostedService>(
+                            _ => new TokenObserverService(
+                                chainName: "HecoChain",
+                                telegramNotifier: new TelegramNotifier(
+                                    "-516536036"),
+                                chainDataHandler: hecoDataHandler)
                         );
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "HecoChain",
                                 "http://13.229.182.155:8545",
                                 servicesConfig.MaxParallelism,
-                                bscDataHandler,
+                                hecoDataHandler,
                                 allAddresses
                             ));
                     }
