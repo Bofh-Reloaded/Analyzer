@@ -113,14 +113,14 @@ namespace AnalyzerCore
                                 hecoDataHandler
                             )
                         );
-                        services.AddSingleton<IHostedService>(
+                        /*services.AddSingleton<IHostedService>(
                             _ => new TokenObserverService(
                                 chainName: "HecoChain",
                                 telegramNotifier: new TelegramNotifier(
                                     "-516536036"),
                                 chainDataHandler: hecoDataHandler,
                                 "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68")
-                        );
+                        );*/
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "HecoChain",
