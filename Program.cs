@@ -87,7 +87,7 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "BinanceSmartChain",
-                                "http://162.55.98.218:8545",
+                                "http://122.155.166.61:8545",
                                 servicesConfig.MaxParallelism,
                                 bscDataHandler,
                                 allAddresses
