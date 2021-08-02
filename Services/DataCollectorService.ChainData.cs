@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using log4net;
@@ -24,12 +25,12 @@ namespace AnalyzerCore.Services
             public readonly Web3 Web3;
 
 
-            public ChainData(Web3 web3, string chainName, int maxParallelism, ILog log, List<string> addresses)
+            public ChainData(Web3 web3, string chainName, int maxParallelism, List<string> addresses)
             {
                 Web3 = web3;
                 if (chainName != null) _chainName = chainName;
                 _maxParallelism = maxParallelism;
-                _log = log;
+                _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
                 Transactions = new BlockingCollection<EnTransaction>();
                 Addresses = new Dictionary<string, Address>();
                 _addressesToAnalyze = addresses;
@@ -50,9 +51,10 @@ namespace AnalyzerCore.Services
                     {
                         // Retrieve Transactions inside block X
                         blockParameter = new BlockParameter((ulong) b);
-                        using var block = Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
+                        using var block =
+                            Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
                         block.Wait(cancellationToken);
-                        Log.Debug(
+                        _log.Debug(
                             $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
                         blockNum++;
                         var txCounter = 0;

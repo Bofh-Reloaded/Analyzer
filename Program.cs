@@ -21,7 +21,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -93,23 +93,34 @@ namespace AnalyzerCore
                                 allAddresses
                             ));
                     }
-/*
+
                     if (servicesConfig.HecoEnabled)
-                        // Create and add the HostedService for Heco Chain
+                    {
+                        // Temporary fix to get only our addresses
+                        var allAddresses = analyzerConfig.HecoEnemies;
+                        allAddresses.Add(analyzerConfig.HecoAddress);
+                        var bscDataHandler =
+                            new DataCollectorService.ChainDataHandler();
                         services.AddSingleton<IHostedService>(
                             _ => new AnalyzerService(
                                 "HecoChain",
-                                "http://155.138.154.45:8545",
                                 analyzerConfig.HecoEnemies,
                                 new TelegramNotifier(
                                     "-516536036"),
-                                3,
-                                servicesConfig.MaxParallelism,
+                                5,
                                 analyzerConfig.HecoAddress,
-                                false
+                                bscDataHandler
                             )
                         );
-                        */
+                        services.AddSingleton<IHostedService>(
+                            _ => new DataCollectorService(
+                                "HecoChain",
+                                "http://13.229.182.155:8545",
+                                servicesConfig.MaxParallelism,
+                                bscDataHandler,
+                                allAddresses
+                            ));
+                    }
                 });
         }
     }

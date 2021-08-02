@@ -17,18 +17,15 @@ namespace AnalyzerCore.Services
 
         private const int NumberOfBlocksToRetrieve = 500;
 
-        // Initialize Logger
-        private static readonly ILog Log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod()?.DeclaringType
-        );
-
         private readonly List<string> _addresses;
         private readonly ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
 
+        private readonly ILog _log;
+
         private readonly int _maxParallelism;
 
-        private readonly Web3 _web3;
+        public readonly Web3 Web3;
 
         public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler,
             List<string> addresses)
@@ -36,46 +33,47 @@ namespace AnalyzerCore.Services
             _chainName = chainName;
             _maxParallelism = maxParallelism;
             _chainDataHandler = chainDataHandler;
+            _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
             // Registering Web3 client endpoint
-            Log.Info($"DataCollectorService Initialized for chain: {chainName}");
+            _log.Info($"DataCollectorService Initialized for chain: {chainName}");
             try
             {
-                _web3 = new Web3(uri);
+                Web3 = new Web3(uri);
             }
             catch
             {
-                Log.Error($"Cannot connect to RPC: {uri}.");
+                _log.Error($"Cannot connect to RPC: {uri}.");
             }
-            
+
             _addresses = addresses;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             stoppingToken.Register(() =>
-                Log.Info($"DataCollectorService background task is stopping for chain: {_chainName}"));
+                _log.Info($"DataCollectorService background task is stopping for chain: {_chainName}"));
             while (!stoppingToken.IsCancellationRequested)
             {
-                Log.Info($"Starting a new cycle for chain: {_chainName}");
+                _log.Info($"Starting a new cycle for chain: {_chainName}");
                 ChainData chainData = null;
                 try
                 {
-                    chainData = new ChainData(_web3, _chainName, _maxParallelism, Log, _addresses);
+                    chainData = new ChainData(Web3, _chainName, _maxParallelism, _addresses);
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    Log.Error("Cannot Connect to RPC Server");
+                    _log.Error("Cannot Connect to RPC Server");
                     await StopAsync(cancellationToken: stoppingToken);
                     return;
                 }
 
                 Debug.Assert(chainData != null, nameof(chainData) + " != null");
                 var currentBlock = chainData.CurrentBlock;
-                Log.Info($"Processing Blocks: {NumberOfBlocksToRetrieve.ToString()}");
+                _log.Info($"Processing Blocks: {NumberOfBlocksToRetrieve.ToString()}");
                 var startBlock = new HexBigInteger(currentBlock.Value - NumberOfBlocksToRetrieve);
-                Log.Info($"From Block: {startBlock.Value.ToString()} To Block: {currentBlock.Value.ToString()}");
-                chainData.GetBlocks((long) startBlock.Value, (long) currentBlock.Value, stoppingToken);
-                Log.Info($"Total Trx Retrieved: {chainData.Transactions.Count.ToString()}");
+                _log.Info($"From Block: {startBlock.Value.ToString()} To Block: {currentBlock.Value.ToString()}");
+                await Task.Run(() => chainData.GetBlocks((long) startBlock.Value, (long) currentBlock.Value, stoppingToken), stoppingToken);
+                _log.Info($"Total Trx Retrieved: {chainData.Transactions.Count.ToString()}");
                 _chainDataHandler.DataChange(chainData);
                 await Task.Delay(TaskDelayMs, stoppingToken);
             }

@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
+using Nethereum.Model;
 using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Services
@@ -30,9 +32,7 @@ namespace AnalyzerCore.Services
         private readonly string _chainName;
 
         // Initialize Logger
-        private readonly ILog _log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod()?.DeclaringType
-        );
+        private readonly ILog _log;
 
         private readonly string _ourAddress;
 
@@ -52,7 +52,7 @@ namespace AnalyzerCore.Services
             _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
             //_addresses.Add(ourAddress);
             _chainDataHandler = chainDataHandler;
-
+            _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {_chainName}");
             _log.Info($"AnalyzerService Initialized for chain: {chainName}");
         }
 
@@ -73,7 +73,7 @@ namespace AnalyzerCore.Services
             if (chainData.Transactions.Count <= 0) return;
 
             _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
-            
+
             var msg = new Message
             {
                 Addresses = new List<AddressStats>(),
