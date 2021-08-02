@@ -111,7 +111,11 @@ namespace AnalyzerCore.Services
         }
         private void NotifyMissingTokens()
         {
-            if (_missingTokens.Count <= 0) return;
+            if (_missingTokens.Count <= 0)
+            {
+                _log.Info("No Missing token found this time");
+                return;
+            }
             _telegramNotifier.SendMessage(
                 string.Join(
                     Environment.NewLine,
