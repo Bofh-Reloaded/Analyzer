@@ -83,7 +83,8 @@ namespace AnalyzerCore
                                 telegramNotifier: new TelegramNotifier(
                                     "-560874043"),
                                 chainDataHandler: bscDataHandler,
-                                addressToCompare: "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178")
+                                addressToCompare: "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
+                                "bsc_tokenlists.data")
                         );
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(

@@ -25,9 +25,7 @@ namespace AnalyzerCore.Services
         private readonly string _chainName;
 
         // Initialize Logger
-        private readonly ILog _log = LogManager.GetLogger(
-            MethodBase.GetCurrentMethod()?.DeclaringType
-        );
+        private readonly ILog _log;
 
         private readonly ConcurrentDictionary<string, Token> _missingTokens;
         private readonly TelegramNotifier _telegramNotifier;
@@ -38,17 +36,23 @@ namespace AnalyzerCore.Services
         // Initialize configuration accessor
         private readonly IConfigurationRoot? _configuration;
 
-        public TokenObserverService(string chainName, TelegramNotifier telegramNotifier,
-            DataCollectorService.ChainDataHandler chainDataHandler, string addressToCompare)
+        public TokenObserverService(
+            string chainName, 
+            TelegramNotifier telegramNotifier,
+            DataCollectorService.ChainDataHandler chainDataHandler, 
+            string addressToCompare, 
+            string tokenFileName
+            )
         {
             _chainName = chainName;
             _telegramNotifier = telegramNotifier;
             _chainDataHandler = chainDataHandler;
             _tokenAddressToCompareWith = addressToCompare;
+            _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
             // Load configuration regarding tokens
             _configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("tokens.json", false, true)
+                .AddJsonFile(tokenFileName, false, true)
                 .Build();
             _tokenList = _configuration.Get<TokenListConfig>();
             _missingTokens = new ConcurrentDictionary<string, Token>();
