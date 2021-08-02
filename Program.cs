@@ -82,7 +82,8 @@ namespace AnalyzerCore
                                 chainName: "BinanceSmartChain",
                                 telegramNotifier: new TelegramNotifier(
                                     "-560874043"),
-                                chainDataHandler: bscDataHandler)
+                                chainDataHandler: bscDataHandler,
+                                addressToCompare: "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178")
                         );
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
@@ -117,7 +118,8 @@ namespace AnalyzerCore
                                 chainName: "HecoChain",
                                 telegramNotifier: new TelegramNotifier(
                                     "-516536036"),
-                                chainDataHandler: hecoDataHandler)
+                                chainDataHandler: hecoDataHandler,
+                                "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68")
                         );
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(

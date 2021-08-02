@@ -17,7 +17,7 @@ namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
-        private const string TokenAddressToCompareWith = "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178";
+        private readonly string _tokenAddressToCompareWith;
         private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private const int TaskDelayMs = 60000;
@@ -39,11 +39,12 @@ namespace AnalyzerCore.Services
         private readonly IConfigurationRoot? _configuration;
 
         public TokenObserverService(string chainName, TelegramNotifier telegramNotifier,
-            DataCollectorService.ChainDataHandler chainDataHandler)
+            DataCollectorService.ChainDataHandler chainDataHandler, string addressToCompare)
         {
             _chainName = chainName;
             _telegramNotifier = telegramNotifier;
             _chainDataHandler = chainDataHandler;
+            _tokenAddressToCompareWith = addressToCompare;
             // Load configuration regarding tokens
             _configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
@@ -72,7 +73,7 @@ namespace AnalyzerCore.Services
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t => 
-                    t.Transaction.From == TokenAddressToCompareWith || t.Transaction.To == TokenAddressToCompareWith);
+                    t.Transaction.From == _tokenAddressToCompareWith || t.Transaction.To == _tokenAddressToCompareWith);
             Parallel.ForEach(transactionsToAnalyze, t =>
             {
                 var logsList = t.TransactionReceipt.Logs;
