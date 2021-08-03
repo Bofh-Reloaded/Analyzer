@@ -78,6 +78,7 @@ namespace AnalyzerCore.Services
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t => 
                     t.Transaction.From == _tokenAddressToCompareWith || t.Transaction.To == _tokenAddressToCompareWith);
+            _log.Debug($"Total transaction to analyze: {transactionsToAnalyze.Count().ToString()}");
             Parallel.ForEach(transactionsToAnalyze, t =>
             {
                 var logsList = t.TransactionReceipt.Logs;
@@ -85,6 +86,7 @@ namespace AnalyzerCore.Services
                     e => string.Equals(e["topics"][0].ToString().ToLower(),
                         SyncEventAddress, StringComparison.Ordinal)
                 ).ToList();
+                _log.Debug($"syncEvents: {syncEvents.Count.ToString()}");
                 foreach (var contractHandler in syncEvents.Select(contract => contract["address"]
                         .ToString())
                     .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)))
@@ -97,20 +99,25 @@ namespace AnalyzerCore.Services
                     token1OutputDto.Wait();
                     foreach (var token in new List<string> {token0OutputDto.Result.ReturnValue1, token1OutputDto.Result.ReturnValue1})
                     {
+                        _log.Debug($"[ ] Token: {token}");
                         var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
                         var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
                         tokenSymbol.Wait();
                         var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
                         tokenTotalSupply.Wait();
+                        _log.Debug($"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory.Result}");
                         EvaluateToken(token, tokenSymbol.Result, tokenTotalSupply.Result, t.Transaction.TransactionHash, poolFactory.Result);
                     }
+                    _log.Debug("TEST");
                 }
+                _log.Debug("TEST2");
             });
             _log.Info("Analysis complete");
             NotifyMissingTokens();
         }
         private void NotifyMissingTokens()
         {
+            _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
             if (_missingTokens.Count <= 0)
             {
                 _log.Info("No Missing token found this time");
@@ -131,7 +138,12 @@ namespace AnalyzerCore.Services
 
         private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash, string factory)
         {
-            if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token)) return;
+            if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token))
+            {
+                _log.Debug($"Token: {token} already known");
+                return;
+            };
+            _log.Debug($"For token: {token} we are before the if");
             // Check if the token is already in the list
             if (_missingTokens.ContainsKey(token))
             {

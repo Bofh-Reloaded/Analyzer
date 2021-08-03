@@ -21,7 +21,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Info;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -59,7 +59,7 @@ namespace AnalyzerCore
                             )
                         );
 */
-                    if (servicesConfig.BscEnabled)
+                    /*if (servicesConfig.BscEnabled)
                     {
                         // Temporary fix to get only our addresses
                         var allAddresses = analyzerConfig.BscEnemies;
@@ -94,7 +94,7 @@ namespace AnalyzerCore
                                 bscDataHandler,
                                 allAddresses
                             ));
-                    }
+                    }*/
 
                     if (servicesConfig.HecoEnabled)
                     {
@@ -126,7 +126,7 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "HecoChain",
-                                "http://13.229.182.155:8545",
+                                "http://155.138.154.45:8545",
                                 servicesConfig.MaxParallelism,
                                 hecoDataHandler,
                                 allAddresses
