@@ -126,7 +126,7 @@ namespace AnalyzerCore
                         services.AddSingleton<IHostedService>(
                             _ => new DataCollectorService(
                                 "HecoChain",
-                                "http://155.138.154.45:8545",
+                                "http://161.97.151.87:8545",
                                 servicesConfig.MaxParallelism,
                                 hecoDataHandler,
                                 allAddresses
