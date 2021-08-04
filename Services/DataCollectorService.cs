@@ -59,6 +59,7 @@ namespace AnalyzerCore.Services
                 try
                 {
                     chainData = new ChainData(Web3, _chainName, _maxParallelism, _addresses);
+                    _log.Info($"Retrieved currentBlock: {chainData.CurrentBlock}");
                 }
                 catch (Exception)
                 {

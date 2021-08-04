@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models
 {
@@ -6,25 +7,59 @@ namespace AnalyzerCore.Models
     {
     }
 
-    public class AnalyzerConfig
-    {
-        public string PlyAddress { get; set; }
-        public string BscAddress { get; set; }
-        public string HecoAddress { get; set; }
-        public List<string> PlyEnemies { get; set; }
-        public List<string> BscEnemies { get; set; }
-        public List<string> HecoEnemies { get; set; }
-    }
-
+// Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse); 
     public class ServicesConfig
     {
-        public bool BscEnabled { get; set; }
-        public bool PlyEnabled { get; set; }
-        public bool HecoEnabled { get; set; }
-        public bool TokenAnalysis { get; set; }
-        public bool PlyPendingEnabled { get; set; }
-        public int MaxParallelism { get; set; }
+        [JsonProperty("DataCollector")] public bool DataCollector { get; set; }
+
+        [JsonProperty("AnalyzerService")] public bool AnalyzerService { get; set; }
+
+        [JsonProperty("TokenAnalyzer")] public bool TokenAnalyzer { get; set; }
+
+        [JsonProperty("MaxParallelism")] public int MaxParallelism { get; set; }
     }
+
+    public class Heco
+    {
+        [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
+
+        [JsonProperty("Address")] public string Address { get; set; }
+
+        [JsonProperty("ServicesConfig")] public ServicesConfig ServicesConfig { get; set; }
+    }
+
+    public class Bsc
+    {
+        [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
+
+        [JsonProperty("Address")] public string Address { get; set; }
+
+        [JsonProperty("ServicesConfig")] public ServicesConfig ServicesConfig { get; set; }
+    }
+
+    public class Ply
+    {
+        [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
+
+        [JsonProperty("Address")] public string Address { get; set; }
+
+        [JsonProperty("ServicesConfig")] public ServicesConfig ServicesConfig { get; set; }
+    }
+
+    public class AnalyzerConfig
+    {
+        [JsonProperty("Heco")] public Heco Heco { get; set; }
+
+        [JsonProperty("Bsc")] public Bsc Bsc { get; set; }
+
+        [JsonProperty("Ply")] public Ply Ply { get; set; }
+    }
+
+    public class Root
+    {
+        [JsonProperty("AnalyzerConfig")] public AnalyzerConfig AnalyzerConfig { get; set; }
+    }
+
 
     public class TokenListConfig
     {
