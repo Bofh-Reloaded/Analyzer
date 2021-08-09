@@ -1,6 +1,4 @@
-BSC:
-admin@CF02:~$ geth attach http://116.203.223.143:8545 --exec net.peerCount
-30
+
 admin@CF02:~$ geth attach http://13.250.53.181:8545 --exec net.peerCount
 275
 admin@CF02:~$ geth attach http://135.148.123.21:8545 --exec net.peerCount
