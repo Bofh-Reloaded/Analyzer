@@ -17,24 +17,24 @@ namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
-        private readonly string _tokenAddressToCompareWith;
         private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private const int TaskDelayMs = 60000;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
 
+        // Initialize configuration accessor
+        private readonly IConfigurationRoot? _configuration;
+
         // Initialize Logger
         private readonly ILog _log;
 
         private readonly ConcurrentDictionary<string, Token> _missingTokens;
         private readonly TelegramNotifier _telegramNotifier;
-
-        private TokenListConfig _tokenList;
+        private readonly string _tokenAddressToCompareWith;
         private IDisposable? _cancellation;
 
-        // Initialize configuration accessor
-        private readonly IConfigurationRoot? _configuration;
+        private TokenListConfig _tokenList;
 
         public TokenObserverService(
             string chainName, 
@@ -115,6 +115,7 @@ namespace AnalyzerCore.Services
             _log.Info("Analysis complete");
             NotifyMissingTokens();
         }
+
         private void NotifyMissingTokens()
         {
             _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
