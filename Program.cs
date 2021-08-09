@@ -79,7 +79,7 @@ namespace AnalyzerCore
                             services.AddSingleton<IHostedService>(
                                 _ => new DataCollectorService(
                                     "PolygonChain",
-                                    "http://162.55.94.149:8545",
+                                    analyzerConfig.Ply.RpcEndpoint,
                                     analyzerConfig.Ply.ServicesConfig.MaxParallelism,
                                     plyDataHandler,
                                     plyAllAddresses
@@ -125,7 +125,7 @@ namespace AnalyzerCore
                             services.AddSingleton<IHostedService>(
                                 _ => new DataCollectorService(
                                     "BinanceSmartChain",
-                                    "http://13.250.53.181:8545",
+                                    analyzerConfig.Bsc.RpcEndpoint,
                                     analyzerConfig.Bsc.ServicesConfig.MaxParallelism,
                                     bscDataHandler,
                                     bscAllAddresses
@@ -170,7 +170,7 @@ namespace AnalyzerCore
                             services.AddSingleton<IHostedService>(
                                 _ => new DataCollectorService(
                                     "HecoChain",
-                                    "http://155.138.154.45:8545",
+                                    analyzerConfig.Heco.RpcEndpoint,
                                     analyzerConfig.Heco.ServicesConfig.MaxParallelism,
                                     hecoDataHandler,
                                     hecoAllAddresses

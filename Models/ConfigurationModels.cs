@@ -21,6 +21,7 @@ namespace AnalyzerCore.Models
 
     public class Heco
     {
+        [JsonProperty("RpcEndpoint")] public string RpcEndpoint { get; set; }
         [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
 
         [JsonProperty("Address")] public string Address { get; set; }
@@ -30,6 +31,7 @@ namespace AnalyzerCore.Models
 
     public class Bsc
     {
+        [JsonProperty("RpcEndpoint")] public string RpcEndpoint { get; set; }
         [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
 
         [JsonProperty("Address")] public string Address { get; set; }
@@ -39,6 +41,7 @@ namespace AnalyzerCore.Models
 
     public class Ply
     {
+        [JsonProperty("RpcEndpoint")] public string RpcEndpoint { get; set; }
         [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
 
         [JsonProperty("Address")] public string Address { get; set; }
