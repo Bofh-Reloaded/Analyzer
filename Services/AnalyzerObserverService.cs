@@ -121,7 +121,7 @@ namespace AnalyzerCore.Services
                         };
                         if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
                         {
-                            // Analyze the stats for type of trade
+                            // Analyze the stats for type of trade (node digits are in position 7,7 after 0x)
                             blockRangeStats.T0Trx = trxToAnalyze
                                 .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                 .ToList();

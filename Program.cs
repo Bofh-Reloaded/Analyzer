@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using AnalyzerCore.Models;
@@ -20,7 +21,7 @@ namespace AnalyzerCore
         {
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy)LogManager.GetRepository()).Root.Level = Level.Info;
+            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -40,7 +41,7 @@ namespace AnalyzerCore
                         var section = configuration.GetSection(nameof(AnalyzerConfig));
                         var analyzerConfig = section.Get<AnalyzerConfig>();
 
-                        
+
                         // Poly
                         var plyAllAddresses = analyzerConfig.Ply.Enemies;
                         plyAllAddresses.Add(analyzerConfig.Ply.Address);
@@ -69,7 +70,7 @@ namespace AnalyzerCore
                                     telegramNotifier: new TelegramNotifier(
                                         "-532850503"),
                                     chainDataHandler: plyDataHandler,
-                                    addressToCompare: "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
+                                    addressesToCompare: new List<string> {"0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178"},
                                     "ply_tokenlists.data")
                             );
                         }
@@ -115,7 +116,11 @@ namespace AnalyzerCore
                                     telegramNotifier: new TelegramNotifier(
                                         "-560874043"),
                                     chainDataHandler: bscDataHandler,
-                                    addressToCompare: "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
+                                    addressesToCompare: new List<string>
+                                    {
+                                        "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
+                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856",
+                                    },
                                     "bsc_tokenlists.data")
                             );
                         }
@@ -160,7 +165,11 @@ namespace AnalyzerCore
                                     telegramNotifier: new TelegramNotifier(
                                         "-516536036"),
                                     chainDataHandler: hecoDataHandler,
-                                    "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
+                                    new List<string>
+                                    {
+                                        "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
+                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856"
+                                    },
                                     "heco_tokenlists.data")
                             );
                         }

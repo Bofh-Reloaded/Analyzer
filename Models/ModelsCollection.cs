@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Numerics;
 using AnalyzerCore.Services;
@@ -52,11 +53,11 @@ namespace AnalyzerCore.Models
     {
         [JsonProperty]
         public string TokenAddress { get; set; }
-        public string TransactionHash { get; set; }
+        public List<string> TransactionHashes { get; set; }
 
         public string GetTransactionHash()
         {
-            return $"<a href='https://bscscan.com/tx/{TransactionHash}'>txHash</a>";
+            return $"<a href='https://bscscan.com/tx/{TransactionHashes.Last()}'>txHash</a>";
         }
         public string PoolFactory { get; set; }
         [JsonProperty]
@@ -65,5 +66,7 @@ namespace AnalyzerCore.Models
         public BigInteger TokenTotalSupply { get; set; }
         public bool IsDeflationary { get; set; }
         public int TxCount { get; set; }
+        public string From { get; set; }
+        public string To { get; set; }
     }
 }

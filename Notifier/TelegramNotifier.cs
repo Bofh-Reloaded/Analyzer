@@ -42,9 +42,9 @@ namespace AnalyzerCore.Notifier
                     disableWebPagePreview: true
                 );
             }
-            catch (Exception)
+            catch (Exception r)
             {
-                Log.Error("Message too long?");
+                Log.Error(r);
             }
         }
 
@@ -63,16 +63,16 @@ namespace AnalyzerCore.Notifier
                                 $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
                             if (s.T0TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeded: {s.T0TrxSucceded.Count.ToString()}, WR: {100 * s.T0TrxSucceded.Count / s.T0Trx.Count}%");
+                                    $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {100 * s.T0TrxSucceded.Count / s.T0Trx.Count}%");
                             if (s.T1TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeded: {s.T1TrxSucceded.Count.ToString()}, WR: {100 * s.T1TrxSucceded.Count / s.T1Trx.Count}%");
+                                    $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {100 * s.T1TrxSucceded.Count / s.T1Trx.Count}%");
                             if (s.T2TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeded: {s.T2TrxSucceded.Count.ToString()}, WR: {100 * s.T2TrxSucceded.Count / s.T2Trx.Count}%");
+                                    $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {100 * s.T2TrxSucceded.Count / s.T2Trx.Count}%");
                             if (s.ContPSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeded: {s.ContPSucceded.Count.ToString()}, WR: {100 * s.ContPSucceded.Count / s.ContP.Count}%");
+                                    $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {100 * s.ContPSucceded.Count / s.ContP.Count}%");
                         }
                         else
                         {

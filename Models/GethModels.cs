@@ -58,10 +58,11 @@ namespace AnalyzerCore.Models.GethModels
 
 public static class OpCodes
 {
-    public static readonly string T0 = new string("085ea7b3");
-    public static readonly string T1 = new string("185ea7b3");
-    public static readonly string T2 = new string("285ea7b3");
-    public static readonly string Cont = new string("985ea7b3");
+    public static readonly string T0 = new string("08");
+    public static readonly string T1 = new string("18");
+    public static readonly string T2 = new string("28");
+    public static readonly string Cont = new string("98");
+    public static readonly string Unknown = new string("99");
 }
 
 public partial class Token0Function : Token0FunctionBase

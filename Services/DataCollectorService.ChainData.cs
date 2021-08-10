@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -54,16 +55,15 @@ namespace AnalyzerCore.Services
                         using var block =
                             Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
                         block.Wait(cancellationToken);
-                        _log.Debug(
+                        _log.Info(
                             $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
                         blockNum++;
                         var txCounter = 0;
-                        Parallel.ForEach(block.Result.Transactions, e =>
+                        Parallel.ForEach(block.Result.Transactions
+                            .Where(t => t.From != null && t.To != null), e =>
                         {
                             // Skip if we don't care about the address
-                            if (e.To != null &&
-                                e.From != null &&
-                                !_addressesToAnalyze.Contains(e.From.ToLower()) &&
+                            if (!_addressesToAnalyze.Contains(e.From.ToLower()) &&
                                 !_addressesToAnalyze.Contains(e.To.ToLower()))
                                 return;
                             totaltrx++;
