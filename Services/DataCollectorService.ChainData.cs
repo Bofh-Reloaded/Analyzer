@@ -38,6 +38,7 @@ namespace AnalyzerCore.Services
                 // Reading current last block processed on chain
                 _currentBlock = Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
+                _log.Debug($"Retrieved Block: {_currentBlock.Result}");
             }
 
             public HexBigInteger CurrentBlock => _currentBlock.Result;
