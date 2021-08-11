@@ -77,48 +77,56 @@ namespace AnalyzerCore.Services
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t =>
-                    _tokenAddressToCompareWith.Contains(t.Transaction.From) ||
-                    _tokenAddressToCompareWith.Contains(t.Transaction.To));
+                    _tokenAddressToCompareWith.Contains(t.Transaction.From.ToLower()) ||
+                    _tokenAddressToCompareWith.Contains(t.Transaction.To.ToLower()));
             var enTransactions = transactionsToAnalyze.ToList();
             _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
             Parallel.ForEach(enTransactions, t =>
             {
-                var logsList = t.TransactionReceipt.Logs;
-                var syncEvents = logsList.Where(
-                    e => string.Equals(e["topics"][0].ToString().ToLower(),
-                        SyncEventAddress, StringComparison.Ordinal)
-                ).ToList();
-                foreach (var contractHandler in syncEvents.Select(contract => contract["address"]
-                        .ToString())
-                    .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)))
+                try
                 {
-                    var token0OutputDto =
-                        contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                    token0OutputDto.Wait();
-                    var poolFactory = contractHandler.QueryAsync<FactoryFunction, string>();
-                    poolFactory.Wait();
-                    var token1OutputDto =
-                        contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                    token1OutputDto.Wait();
-                    foreach (var token in new List<string>
-                        {token0OutputDto.Result.ReturnValue1, token1OutputDto.Result.ReturnValue1})
+                    var logsList = t.TransactionReceipt.Logs;
+                    var syncEvents = logsList.Where(
+                        e => string.Equals(e["topics"][0].ToString().ToLower(),
+                            SyncEventAddress, StringComparison.Ordinal)
+                    ).ToList();
+                    foreach (var contractHandler in syncEvents.Select(contract => contract["address"]
+                            .ToString())
+                        .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)))
                     {
-                        _log.Debug($"[ ] Token: {token}");
-                        var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
-                        var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
-                        tokenSymbol.Wait();
-                        var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                        tokenTotalSupply.Wait();
-                        _log.Debug(
-                            $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory.Result}");
-                        EvaluateToken(
-                            token,
-                            tokenSymbol.Result,
-                            tokenTotalSupply.Result,
-                            t.Transaction.TransactionHash,
-                            poolFactory.Result,
-                            t);
+                        var token0OutputDto =
+                            contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
+                        token0OutputDto.Wait();
+                        var poolFactory = contractHandler.QueryAsync<FactoryFunction, string>();
+                        poolFactory.Wait();
+                        var token1OutputDto =
+                            contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
+                        token1OutputDto.Wait();
+                        foreach (var token in new List<string>
+                            {token0OutputDto.Result.ReturnValue1, token1OutputDto.Result.ReturnValue1})
+                        {
+                            _log.Debug($"[ ] Token: {token}");
+                            var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
+                            var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
+                            tokenSymbol.Wait();
+                            var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                            tokenTotalSupply.Wait();
+                            _log.Debug(
+                                $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory.Result}");
+                            EvaluateToken(
+                                token,
+                                tokenSymbol.Result,
+                                tokenTotalSupply.Result,
+                                t.Transaction.TransactionHash,
+                                poolFactory.Result,
+                                t);
+                        }
                     }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
                 }
             });
             _log.Info("Analysis complete");
@@ -179,7 +187,7 @@ namespace AnalyzerCore.Services
                     _missingTokens[token].IsDeflationary = true;
                 }
 
-                // Update token details
+                // Update token details if we haven't seen that trx yet
                 if (!_missingTokens[token].TransactionHashes.Contains(txHash))
                 {
                     _missingTokens[token].TransactionHashes.Add(txHash);
