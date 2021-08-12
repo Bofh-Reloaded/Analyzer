@@ -23,6 +23,7 @@ namespace AnalyzerCore.Services
         private const int TaskDelayMs = 60000;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
+        private readonly string _baseUri;
 
         // Initialize configuration accessor
         private readonly IConfigurationRoot? _configuration;
@@ -42,13 +43,13 @@ namespace AnalyzerCore.Services
             TelegramNotifier telegramNotifier,
             DataCollectorService.ChainDataHandler chainDataHandler,
             List<string> addressesToCompare,
-            string tokenFileName
-        )
+            string tokenFileName, string baseUri)
         {
             _chainName = chainName;
             _telegramNotifier = telegramNotifier;
             _chainDataHandler = chainDataHandler;
             _tokenAddressToCompareWith = addressesToCompare;
+            _baseUri = baseUri;
             _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
             // Load configuration regarding tokens
             _configuration = new ConfigurationBuilder()
@@ -235,8 +236,7 @@ namespace AnalyzerCore.Services
                 _log.Info("No Missing token found this time");
                 return;
             }
-
-            const string baseUri = "https://bscscan.com/address/";
+            
             foreach (var tFound in _missingTokens.Values
                 .ToList()
                 .OrderBy(o => o.TxCount)
@@ -248,9 +248,9 @@ namespace AnalyzerCore.Services
                             $"<b>{t.TokenSymbol} [{t.TokenAddress}]:</b>",
                             $"  isDeflationary: {t.IsDeflationary.ToString()}",
                             $"  totalTxCount: {t.TxCount.ToString()}",
-                            $"  lastTxSeen: {t.GetTransactionHash()}",
-                            $"  from: <a href='{baseUri}{t.From}'>{t.From[..6]}...{t.From[^6..]}</a>",
-                            $"  to: <a href='{baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
+                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.TransactionHashes.Last()}'>{t.TransactionHashes.Last()[..8]}...{t.TransactionHashes.Last()[^6..]}</a>",
+                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..6]}...{t.From[^6..]}</a>",
+                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
                         )))
             {
                 Task.Run(async delegate

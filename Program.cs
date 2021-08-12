@@ -71,7 +71,8 @@ namespace AnalyzerCore
                                         "-532850503"),
                                     chainDataHandler: plyDataHandler,
                                     addressesToCompare: new List<string> {"0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178"},
-                                    "ply_tokenlists.data")
+                                    "ply_tokenlists.data",
+                                    "https://polygonscan.com/")
                             );
                         }
 
@@ -121,7 +122,8 @@ namespace AnalyzerCore
                                         "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
                                         "0xddafd3baab340b10c19c066ae52f96fe5bee1856",
                                     },
-                                    "bsc_tokenlists.data")
+                                    "bsc_tokenlists.data",
+                                    "https://www.bscscan.com/")
                             );
                         }
 
@@ -169,7 +171,8 @@ namespace AnalyzerCore
                                     {
                                         "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68"
                                     },
-                                    "heco_tokenlists.data")
+                                    "heco_tokenlists.data",
+                                    "https://hecoinfo.com/")
                             );
                         }
 
