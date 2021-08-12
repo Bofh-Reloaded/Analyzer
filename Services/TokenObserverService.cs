@@ -97,14 +97,15 @@ namespace AnalyzerCore.Services
                             contract => contract["address"].ToString()
                         )
                         .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)),
-                    async contractHandler =>
+                     contractHandler =>
                     {
                         try
                         {
                             var tokens = AnalyzeSyncEvent(contractHandler);
                             tokens.Wait();
                             if (tokens.Result.Count <= 0) return;
-                            var poolFactory = await contractHandler.QueryAsync<FactoryFunction, string>();
+                            var poolFactory = contractHandler.QueryAsync<FactoryFunction, string>();
+                            poolFactory.Wait();
                             foreach (var token in tokens.Result)
                             {
                                 _log.Debug($"[ ] Token: {token}");
@@ -120,7 +121,7 @@ namespace AnalyzerCore.Services
                                     tokenSymbol.Result,
                                     tokenTotalSupply.Result,
                                     t.Transaction.TransactionHash,
-                                    poolFactory,
+                                    poolFactory.Result,
                                     t);
                             }
                         }
@@ -248,16 +249,12 @@ namespace AnalyzerCore.Services
                             $"<b>{t.TokenSymbol} [{t.TokenAddress}]:</b>",
                             $"  isDeflationary: {t.IsDeflationary.ToString()}",
                             $"  totalTxCount: {t.TxCount.ToString()}",
-                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.TransactionHashes.Last()}'>{t.TransactionHashes.Last()[..8]}...{t.TransactionHashes.Last()[^6..]}</a>",
+                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.TransactionHashes.Last()}'>{t.TransactionHashes.Last()[..8]}...{t.TransactionHashes.Last()[^8..]}</a>",
                             $"  from: <a href='{_baseUri}{t.From}'>{t.From[..6]}...{t.From[^6..]}</a>",
                             $"  to: <a href='{_baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
                         )))
             {
-                Task.Run(async delegate
-                {
-                    _telegramNotifier.SendMessage(tFound);
-                    await Task.Delay(2000);
-                });
+                _telegramNotifier.SendMessage(tFound);
             }
         }
 

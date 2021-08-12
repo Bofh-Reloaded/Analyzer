@@ -54,7 +54,8 @@ namespace AnalyzerCore
                                     "PolygonChain",
                                     analyzerConfig.Ply.Enemies,
                                     new TelegramNotifier(
-                                        "-532850503"),
+                                        "-532850503",
+                                        "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     5,
                                     analyzerConfig.Ply.Address,
                                     plyDataHandler
@@ -68,7 +69,8 @@ namespace AnalyzerCore
                                 _ => new TokenObserverService(
                                     chainName: "PolygonChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-532850503"),
+                                        "-532850503",
+                                        "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     chainDataHandler: plyDataHandler,
                                     addressesToCompare: new List<string> {"0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178"},
                                     "ply_tokenlists.data",
@@ -101,7 +103,8 @@ namespace AnalyzerCore
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.Enemies,
                                     new TelegramNotifier(
-                                        "-560874043"),
+                                        "-560874043",
+                                        "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
                                     5,
                                     analyzerConfig.Bsc.Address,
                                     bscDataHandler
@@ -115,7 +118,8 @@ namespace AnalyzerCore
                                 _ => new TokenObserverService(
                                     chainName: "BinanceSmartChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-560874043"),
+                                        "-560874043",
+                                        "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
                                     chainDataHandler: bscDataHandler,
                                     addressesToCompare: new List<string>
                                     {
@@ -151,7 +155,8 @@ namespace AnalyzerCore
                                     "HecoChain",
                                     analyzerConfig.Heco.Enemies,
                                     new TelegramNotifier(
-                                        "-516536036"),
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                     5,
                                     analyzerConfig.Heco.Address,
                                     hecoDataHandler
@@ -165,7 +170,8 @@ namespace AnalyzerCore
                                 _ => new TokenObserverService(
                                     chainName: "HecoChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-516536036"),
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                     chainDataHandler: hecoDataHandler,
                                     new List<string>
                                     {

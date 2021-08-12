@@ -14,19 +14,19 @@ namespace AnalyzerCore.Notifier
     {
         private static readonly ILog Log = LogManager.GetLogger(MethodBase.GetCurrentMethod()?.DeclaringType);
 
-        private readonly TelegramBotClient _bot = new TelegramBotClient(
-            "1780013642:AAH2nN3rFtRFLQzh4dHd1gjNTdwGWFHrYL8"
-        );
+        private readonly TelegramBotClient _bot;
 
         private readonly ChatId _chatId = new ChatId(identifier: -560874043);
 
-        public TelegramNotifier()
+        public TelegramNotifier(string botToken)
         {
+            _bot = new TelegramBotClient(botToken);
         }
 
-        public TelegramNotifier(string chatId)
+        public TelegramNotifier(string chatId, string botToken)
         {
             _chatId = chatId;
+            _bot = new TelegramBotClient(botToken);
         }
 
         public async void SendMessage(string text)
