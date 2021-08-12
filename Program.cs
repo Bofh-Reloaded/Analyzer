@@ -62,6 +62,7 @@ namespace AnalyzerCore
                             );
                         }
 
+<<<<<<< HEAD
                         if (analyzerConfig.Ply.ServicesConfig.TokenAnalyzer)
                         {
                             services.AddSingleton<IHostedService>(
@@ -187,6 +188,40 @@ namespace AnalyzerCore
                         }
                     }
                 );
+=======
+                    if (servicesConfig.BscEnabled)
+                        // Create and add the HostedService for Binance Smart Chain
+                        services.AddSingleton<IHostedService>(
+                            _ => new AnalyzerService(
+                                "BinanceSmartChain",
+                                "http://13.250.53.181:8545",
+                                analyzerConfig.BscEnemies,
+                                new TelegramNotifier(
+                                    "-560874043"),
+                                5,
+                                servicesConfig.MaxParallelism,
+                                analyzerConfig.BscAddress,
+                                false
+                            )
+                        );
+
+                    if (servicesConfig.HecoEnabled)
+                        // Create and add the HostedService for Heco Chain
+                        services.AddSingleton<IHostedService>(
+                            _ => new AnalyzerService(
+                                "HecoChain",
+                                "http://188.166.254.141:8545",
+                                analyzerConfig.HecoEnemies,
+                                new TelegramNotifier(
+                                    "-516536036"),
+                                3,
+                                servicesConfig.MaxParallelism,
+                                analyzerConfig.HecoAddress,
+                                false
+                            )
+                        );
+                });
+>>>>>>> main
         }
     }
 }
