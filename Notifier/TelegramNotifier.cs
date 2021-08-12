@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text.Json;
 using log4net;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -32,17 +31,25 @@ namespace AnalyzerCore.Notifier
 
         public async void SendMessage(string text)
         {
-            Log.Debug(text);
-            await _bot.SendTextMessageAsync(
-                _chatId,
-                text,
-                ParseMode.Html
-            );
+
+            try
+            {
+                Log.Debug(text);
+                await _bot.SendTextMessageAsync(
+                    _chatId,
+                    text,
+                    ParseMode.Html,
+                    disableWebPagePreview: true
+                );
+            }
+            catch (Exception r)
+            {
+                Log.Error(r);
+            }
         }
 
         public async void SendStatsRecap(Message message)
         {
-            Log.Debug(JsonSerializer.Serialize(message, new JsonSerializerOptions {WriteIndented = true}));
             var m = new List<string> {message.Timestamp};
             foreach (var a in message.Addresses)
             {
@@ -50,22 +57,22 @@ namespace AnalyzerCore.Notifier
                 foreach (var s in a.BlockRanges)
                     try
                     {
-                        if (string.Equals(a.Address, message.ourAddress, StringComparison.CurrentCultureIgnoreCase))
+                        if (string.Equals(a.Address, message.OurAddress, StringComparison.CurrentCultureIgnoreCase))
                         {
                             m.Add(
                                 $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
                             if (s.T0TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeded: {s.T0TrxSucceded.Count.ToString()}, WR: {100 * s.T0TrxSucceded.Count / s.T0Trx.Count}%");
+                                    $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {100 * s.T0TrxSucceded.Count / s.T0Trx.Count}%");
                             if (s.T1TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeded: {s.T1TrxSucceded.Count.ToString()}, WR: {100 * s.T1TrxSucceded.Count / s.T1Trx.Count}%");
+                                    $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {100 * s.T1TrxSucceded.Count / s.T1Trx.Count}%");
                             if (s.T2TrxSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeded: {s.T2TrxSucceded.Count.ToString()}, WR: {100 * s.T2TrxSucceded.Count / s.T2Trx.Count}%");
+                                    $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {100 * s.T2TrxSucceded.Count / s.T2Trx.Count}%");
                             if (s.ContPSucceded.Count > 0)
                                 m.Add(
-                                    $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeded: {s.ContPSucceded.Count.ToString()}, WR: {100 * s.ContPSucceded.Count / s.ContP.Count}%");
+                                    $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {100 * s.ContPSucceded.Count / s.ContP.Count}%");
                         }
                         else
                         {
@@ -73,14 +80,14 @@ namespace AnalyzerCore.Notifier
                                 $" B: {s.BlockRange} T: {s.TotalTransactionsPerBlockRange} S: {s.SuccededTranstactionsPerBlockRange} WR: {s.SuccessRate}");
                         }
                     }
-                    catch (System.DivideByZeroException e)
+                    catch (DivideByZeroException e)
                     {
                         Console.WriteLine(e);
                         throw;
                     }
             }
 
-            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.TPS}\U0001F4CA");
+            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.Tps}\U0001F4CA");
             var _ = await _bot.SendTextMessageAsync(
                 _chatId,
                 Join(Environment.NewLine, m.ToArray()),

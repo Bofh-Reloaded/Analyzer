@@ -1,5 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Numerics;
+using AnalyzerCore.Services;
 using Nethereum.RPC.Eth.DTOs;
+using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models
 {
@@ -19,14 +24,14 @@ namespace AnalyzerCore.Models
         public int SuccededTranstactionsPerBlockRange { get; set; }
         public int TotalTransactionsPerBlockRange { get; set; }
         public string SuccessRate { get; set; }
-        public List<Transaction> T0Trx { get; internal set; }
-        public List<Transaction> T1Trx { get; internal set; }
-        public List<Transaction> T2Trx { get; internal set; }
-        public List<Transaction> ContP { get; internal set; }
-        public List<Transaction> T0TrxSucceded { get; internal set; }
-        public List<Transaction> T1TrxSucceded { get; internal set; }
-        public List<Transaction> T2TrxSucceded { get; internal set; }
-        public List<Transaction> ContPSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T0Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T1Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T2Trx { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> ContP { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T0TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T1TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> T2TrxSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> ContPSucceded { get; internal set; }
     }
 
     public class AddressStats
@@ -39,15 +44,29 @@ namespace AnalyzerCore.Models
     {
         public string Timestamp { get; set; }
         public List<AddressStats> Addresses { get; set; }
-        public int TPS { get; set; }
+        public int Tps { get; set; }
         public int TotalTrx { get; internal set; }
-        public string ourAddress { get; internal set; }
+        public string OurAddress { get; internal set; }
     }
 
-    public class MissingToken
+    public class Token
     {
+        [JsonProperty]
         public string TokenAddress { get; set; }
-        public string TransactionHash { get; set; }
+        public List<string> TransactionHashes { get; set; }
+
+        public string GetTransactionHash()
+        {
+            return $"<a href='https://bscscan.com/tx/{TransactionHashes.Last()}'>txHash</a>";
+        }
         public string PoolFactory { get; set; }
+        [JsonProperty]
+        public string TokenSymbol { get; set; }
+        [JsonProperty]
+        public BigInteger TokenTotalSupply { get; set; }
+        public bool IsDeflationary { get; set; }
+        public int TxCount { get; set; }
+        public string From { get; set; }
+        public string To { get; set; }
     }
 }
