@@ -167,8 +167,7 @@ namespace AnalyzerCore
                                     chainDataHandler: hecoDataHandler,
                                     new List<string>
                                     {
-                                        "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
-                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856"
+                                        "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68"
                                     },
                                     "heco_tokenlists.data")
                             );

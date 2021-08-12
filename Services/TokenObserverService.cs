@@ -12,6 +12,7 @@ using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using log4net;
 using Microsoft.Extensions.Configuration;
+using Nethereum.Contracts.ContractHandlers;
 
 namespace AnalyzerCore.Services
 {
@@ -73,6 +74,8 @@ namespace AnalyzerCore.Services
             _log.Info("New Data Received");
             if (chainData.Transactions.Count <= 0) return;
             _tokenList = _configuration.Get<TokenListConfig>();
+            _tokenList.blacklisted ??= new List<string>();
+
             _log.Info($"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
@@ -81,56 +84,147 @@ namespace AnalyzerCore.Services
                     _tokenAddressToCompareWith.Contains(t.Transaction.To.ToLower()));
             var enTransactions = transactionsToAnalyze.ToList();
             _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
-            Parallel.ForEach(enTransactions, t =>
+            foreach (var t in enTransactions)
             {
-                try
-                {
-                    var logsList = t.TransactionReceipt.Logs;
-                    var syncEvents = logsList.Where(
-                        e => string.Equals(e["topics"][0].ToString().ToLower(),
-                            SyncEventAddress, StringComparison.Ordinal)
-                    ).ToList();
-                    foreach (var contractHandler in syncEvents.Select(contract => contract["address"]
-                            .ToString())
-                        .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)))
+                var logsList = t.TransactionReceipt.Logs;
+                var syncEvents = logsList.Where(
+                    e => string.Equals(e["topics"][0].ToString().ToLower(),
+                        SyncEventAddress, StringComparison.Ordinal)
+                ).ToList();
+                Parallel.ForEach(
+                    syncEvents.Select(
+                            contract => contract["address"].ToString()
+                        )
+                        .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)),
+                    async contractHandler =>
                     {
-                        var token0OutputDto =
-                            contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                        token0OutputDto.Wait();
-                        var poolFactory = contractHandler.QueryAsync<FactoryFunction, string>();
-                        poolFactory.Wait();
-                        var token1OutputDto =
-                            contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                        token1OutputDto.Wait();
-                        foreach (var token in new List<string>
-                            {token0OutputDto.Result.ReturnValue1, token1OutputDto.Result.ReturnValue1})
+                        try
                         {
-                            _log.Debug($"[ ] Token: {token}");
-                            var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
-                            var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
-                            tokenSymbol.Wait();
-                            var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                            tokenTotalSupply.Wait();
-                            _log.Debug(
-                                $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory.Result}");
-                            EvaluateToken(
-                                token,
-                                tokenSymbol.Result,
-                                tokenTotalSupply.Result,
-                                t.Transaction.TransactionHash,
-                                poolFactory.Result,
-                                t);
+                            var tokens = AnalyzeSyncEvent(contractHandler);
+                            tokens.Wait();
+                            if (tokens.Result.Count <= 0) return;
+                            var poolFactory = await contractHandler.QueryAsync<FactoryFunction, string>();
+                            foreach (var token in tokens.Result)
+                            {
+                                _log.Debug($"[ ] Token: {token}");
+                                var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
+                                var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
+                                tokenSymbol.Wait();
+                                var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                                tokenTotalSupply.Wait();
+                                _log.Debug(
+                                    $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory}");
+                                EvaluateToken(
+                                    token,
+                                    tokenSymbol.Result,
+                                    tokenTotalSupply.Result,
+                                    t.Transaction.TransactionHash,
+                                    poolFactory,
+                                    t);
+                            }
                         }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    throw;
-                }
-            });
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e);
+                            throw;
+                        }
+                    });
+            }
+
             _log.Info("Analysis complete");
             NotifyMissingTokens();
+        }
+
+        private async Task<List<string>> AnalyzeSyncEvent(ContractHandler contractHandler)
+        {
+            try
+            {
+                var tokens = new List<string>();
+                _log.Debug($"Called AnalyzeSyncEvent on {contractHandler.ContractAddress}");
+                var token0OutputDto =
+                    await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
+                if (_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
+                    _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1))
+                {
+                    _log.Debug($"Token: {token0OutputDto.ReturnValue1} already known");
+                }
+                else
+                {
+                    tokens.Add(token0OutputDto.ReturnValue1);
+                }
+
+                var token1OutputDto =
+                    await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
+                if (_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
+                    _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1))
+                {
+                    _log.Debug($"Token: {token1OutputDto.ReturnValue1} already known");
+                }
+                else
+                {
+                    tokens.Add(token1OutputDto.ReturnValue1);
+                }
+
+                return tokens;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+        }
+
+        private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash,
+            string factory, DataCollectorService.ChainData.EnTransaction t)
+        {
+            try
+            {
+                // Check if the token is already in the list
+                if (_missingTokens.ContainsKey(token))
+                {
+                    // Token exists, check if the supply is changed
+                    if (tokenTotalSupply < _missingTokens[token].TokenTotalSupply)
+                    {
+                        _log.Info(
+                            $"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
+                        _missingTokens[token].IsDeflationary = true;
+                    }
+
+                    // Update token details if we haven't seen that trx yet
+                    if (!_missingTokens[token].TransactionHashes.Contains(txHash))
+                    {
+                        _missingTokens[token].TransactionHashes.Add(txHash);
+                        _missingTokens[token].TokenTotalSupply = tokenTotalSupply;
+                        _missingTokens[token].TxCount++;
+                        _missingTokens[token].From = t.Transaction.From;
+                        _missingTokens[token].To = t.Transaction.To;
+                    }
+                }
+                else
+                {
+                    // Create the object inside the dictionary since it's the first time that we see it
+                    _missingTokens[token] = new Token
+                    {
+                        PoolFactory = factory,
+                        TokenAddress = token,
+                        TransactionHashes = new List<string>(),
+                        TokenSymbol = tokenSymbol,
+                        TokenTotalSupply = tokenTotalSupply,
+                        IsDeflationary = false,
+                        TxCount = 1,
+                        From = t.Transaction.From,
+                        To = t.Transaction.To,
+                    };
+                }
+
+                _log.Info(
+                    $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens[token].TxCount.ToString()}");
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex);
+                throw;
+            }
         }
 
         private void NotifyMissingTokens()
@@ -159,63 +253,12 @@ namespace AnalyzerCore.Services
                             $"  to: <a href='{baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
                         )))
             {
-                var t = Task.Run(async delegate
+                Task.Run(async delegate
                 {
                     _telegramNotifier.SendMessage(tFound);
                     await Task.Delay(2000);
                 });
             }
-        }
-
-        private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash,
-            string factory, DataCollectorService.ChainData.EnTransaction t)
-        {
-            if (_tokenList.whitelisted.Contains(token) || _tokenList.blacklisted.Contains(token))
-            {
-                _log.Debug($"[   ] Token: {tokenSymbol} already known");
-                return;
-            }
-
-            // Check if the token is already in the list
-            if (_missingTokens.ContainsKey(token))
-            {
-                // Token exists, check if the supply is changed
-                if (tokenTotalSupply < _missingTokens[token].TokenTotalSupply)
-                {
-                    _log.Info(
-                        $"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
-                    _missingTokens[token].IsDeflationary = true;
-                }
-
-                // Update token details if we haven't seen that trx yet
-                if (!_missingTokens[token].TransactionHashes.Contains(txHash))
-                {
-                    _missingTokens[token].TransactionHashes.Add(txHash);
-                    _missingTokens[token].TokenTotalSupply = tokenTotalSupply;
-                    _missingTokens[token].TxCount++;
-                    _missingTokens[token].From = t.Transaction.From;
-                    _missingTokens[token].To = t.Transaction.To;
-                }
-            }
-            else
-            {
-                // Create the object inside the dictionary since it's the first time that we see it
-                _missingTokens[token] = new Token
-                {
-                    PoolFactory = factory,
-                    TokenAddress = token,
-                    TransactionHashes = new List<string>(),
-                    TokenSymbol = tokenSymbol,
-                    TokenTotalSupply = tokenTotalSupply,
-                    IsDeflationary = false,
-                    TxCount = 1,
-                    From = t.Transaction.From,
-                    To = t.Transaction.To,
-                };
-            }
-
-            _log.Info(
-                $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens[token].TxCount.ToString()}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
