@@ -22,7 +22,9 @@ namespace AnalyzerCore
             var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
             ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
-
+            
+            
+            // 0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9 <- new pair created
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -124,7 +126,7 @@ namespace AnalyzerCore
                                     addressesToCompare: new List<string>
                                     {
                                         "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
-                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856",
+                                        "0x0b8e1cbb1376c2538ca4239df5bfda60bba31710",
                                     },
                                     "bsc_tokenlists.data",
                                     "https://www.bscscan.com/")
