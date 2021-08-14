@@ -55,9 +55,9 @@ namespace AnalyzerCore.Models
         public string TokenAddress { get; set; }
         public List<string> TransactionHashes { get; set; }
 
-        public string GetTransactionHash()
+        public string GetLatestTxHash()
         {
-            return $"<a href='https://bscscan.com/tx/{TransactionHashes.Last()}'>txHash</a>";
+            return TransactionHashes.Count > 0 ? TransactionHashes.Last() : "00000000000000000000000000000000";
         }
         public string PoolFactory { get; set; }
         [JsonProperty]

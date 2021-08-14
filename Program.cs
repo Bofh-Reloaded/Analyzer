@@ -1,17 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using AnalyzerCore.Services;
-using log4net;
-using log4net.Config;
-using log4net.Core;
-using log4net.Repository.Hierarchy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore
 {
@@ -19,9 +17,16 @@ namespace AnalyzerCore
     {
         private static void Main(string[] args)
         {
-            var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-            XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
+            var Log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
             
             
             // 0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9 <- new pair created

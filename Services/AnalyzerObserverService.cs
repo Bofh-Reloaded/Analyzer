@@ -2,15 +2,16 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using log4net;
-using Nethereum.Model;
 using Nethereum.RPC.Eth.DTOs;
+using Serilog;
+using Serilog.Context;
+using Serilog.Core;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore.Services
 {
@@ -20,7 +21,7 @@ namespace AnalyzerCore.Services
         private const int TaskDelayMs = 360000;
 
         // Array of block to analyze
-        private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() {25, 100, 500};
+        private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() { 25, 100, 500 };
 
         // Initialize an empty list of string that will be filled with addresses
         private readonly List<string> _addresses;
@@ -32,7 +33,7 @@ namespace AnalyzerCore.Services
         private readonly string _chainName;
 
         // Initialize Logger
-        private readonly ILog _log;
+        private readonly Logger _log;
 
         private readonly string _ourAddress;
 
@@ -52,8 +53,19 @@ namespace AnalyzerCore.Services
             _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
             //_addresses.Add(ourAddress);
             _chainDataHandler = chainDataHandler;
-            _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {_chainName}");
-            _log.Info($"AnalyzerService Initialized for chain: {chainName}");
+            _log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+            LogContext.PushProperty("SourceContext", $"{_chainName}");
+            
+            _log.Information($"AnalyzerService Initialized for chain: {chainName}");
         }
 
         public void OnCompleted()
@@ -68,11 +80,11 @@ namespace AnalyzerCore.Services
 
         public void OnNext(DataCollectorService.ChainData chainData)
         {
-            _log.Info("New Data Received");
+            _log.Information("New Data Received");
             if (chainData == null) return;
             if (chainData.Transactions.Count <= 0) return;
 
-            _log.Info($"Total trx: {chainData.Transactions.Count.ToString()}");
+            _log.Information($"Total trx: {chainData.Transactions.Count.ToString()}");
 
             var msg = new Message
             {
@@ -84,16 +96,16 @@ namespace AnalyzerCore.Services
             /* Checking succeded transactions */
             foreach (var address in _addresses)
             {
-                var addsStats = new AddressStats {Address = address, BlockRanges = new List<BlockRangeStats>()};
+                var addsStats = new AddressStats { Address = address, BlockRanges = new List<BlockRangeStats>() };
                 // Init Transactions Data
                 chainData.GetAddressTransactions(address);
 
-                _log.Info(
+                _log.Information(
                     $"Evaluating Address: {address} with trx amount: {chainData.Addresses[address].Transactions.Count.ToString()}");
 
                 foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
                 {
-                    _log.Info(
+                    _log.Information(
                         // ReSharper disable once HeapView.BoxingAllocation
                         $"NB: {numberOfBlocks.ToString()} Evaluating SB: {chainData.CurrentBlock.Value - numberOfBlocks} TB: {chainData.CurrentBlock.Value.ToString()}");
 
@@ -106,54 +118,45 @@ namespace AnalyzerCore.Services
                         .Where(
                             t => t.TransactionReceipt.Succeeded() && t.TransactionReceipt.Logs.Count > 0)
                         .ToList();
-                    _log.Info($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
+                    _log.Information($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
 
-                    try
+                    // Calculate the success rate and construct che BlockRangeStat object
+                    var blockRangeStats = new BlockRangeStats
                     {
-                        // Calculate the success rate and construct che BlockRangeStat object
-                        long successRate = 100 * succededTrxs.Count / trxToAnalyze.Count();
-                        var blockRangeStats = new BlockRangeStats
-                        {
-                            BlockRange = numberOfBlocks,
-                            SuccededTranstactionsPerBlockRange = succededTrxs.Count,
-                            TotalTransactionsPerBlockRange = trxToAnalyze.Count,
-                            SuccessRate = $"{successRate.ToString()}%"
-                        };
-                        if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
-                        {
-                            // Analyze the stats for type of trade (node digits are in position 7,7 after 0x)
-                            blockRangeStats.T0Trx = trxToAnalyze
-                                .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
+                        BlockRange = numberOfBlocks,
+                        SuccededTranstactionsPerBlockRange = succededTrxs.Count,
+                        TotalTransactionsPerBlockRange = trxToAnalyze.Count,
+                        SuccessRate = succededTrxs.Count > 0 ? $"{100 * succededTrxs.Count / trxToAnalyze.Count}%" : "n/a"
+                    };
+                    if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
+                    {
+                        blockRangeStats.T0Trx = trxToAnalyze
+                            .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
+                            .ToList();
+                        blockRangeStats.T1Trx = trxToAnalyze
+                            .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
+                            .ToList();
+                        blockRangeStats.T2Trx = trxToAnalyze
+                            .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
+                            .ToList();
+                        blockRangeStats.ContP = trxToAnalyze.Where(t =>
+                                t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
+                            .ToList();
+                        blockRangeStats.T0TrxSucceded =
+                            succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                 .ToList();
-                            blockRangeStats.T1Trx = trxToAnalyze
-                                .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
+                        blockRangeStats.T1TrxSucceded =
+                            succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
                                 .ToList();
-                            blockRangeStats.T2Trx = trxToAnalyze
-                                .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
+                        blockRangeStats.T2TrxSucceded =
+                            succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
                                 .ToList();
-                            blockRangeStats.ContP = trxToAnalyze.Where(t =>
-                                    t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
-                                .ToList();
-                            blockRangeStats.T0TrxSucceded =
-                                succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
-                                    .ToList();
-                            blockRangeStats.T1TrxSucceded =
-                                succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T1}"))
-                                    .ToList();
-                            blockRangeStats.T2TrxSucceded =
-                                succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T2}"))
-                                    .ToList();
-                            blockRangeStats.ContPSucceded = succededTrxs
-                                .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
-                                .ToList();
-                        }
+                        blockRangeStats.ContPSucceded = succededTrxs
+                            .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
+                            .ToList();
+                    }
 
-                        addsStats.BlockRanges.Add(blockRangeStats);
-                    }
-                    catch (DivideByZeroException)
-                    {
-                        _log.Error("No transaction retrieved");
-                    }
+                    addsStats.BlockRanges.Add(blockRangeStats);
                 }
 
                 msg.Addresses.Add(addsStats);
@@ -169,12 +172,12 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Info($"Starting AnalyzerService for chain: {_chainName}");
+            _log.Information($"Starting AnalyzerService for chain: {_chainName}");
             _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}");
             stoppingToken.Register(() =>
                 {
                     Unsubscribe();
-                    _log.Info($"AnalyzerService background task is stopping for chain: {_chainName}");
+                    _log.Information($"AnalyzerService background task is stopping for chain: {_chainName}");
                 }
             );
 
