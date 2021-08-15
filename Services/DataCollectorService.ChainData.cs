@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Nethereum.Hex.HexTypes;
@@ -41,7 +40,7 @@ namespace AnalyzerCore.Services
                     .Enrich.WithThreadId()
                     .Enrich.WithExceptionDetails()
                     .WriteTo.Console(
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                        outputTemplate: $"{{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}} [{{Level:u3}}] [DataCollector:{_chainName}] " +
                                         "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
                 Transactions = new BlockingCollection<EnTransaction>();
