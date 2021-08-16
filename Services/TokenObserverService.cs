@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
@@ -15,7 +14,6 @@ using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
 using Serilog.Context;
 using Serilog.Events;
-using Serilog.Enrichers;
 using Serilog.Exceptions;
 
 namespace AnalyzerCore.Services
@@ -30,16 +28,17 @@ namespace AnalyzerCore.Services
         private readonly string _chainName;
 
         // Initialize configuration accessor
-        private readonly IConfigurationRoot? _configuration;
+        private IConfigurationRoot? _configuration;
 
         private readonly Serilog.Core.Logger _log;
 
-        private readonly ConcurrentDictionary<string, Token> _missingTokens;
+        private ConcurrentDictionary<string, Token> _missingTokens = null!;
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
-        private IDisposable? _cancellation;
-
-        private TokenListConfig _tokenList;
+        private IDisposable _cancellation = null!;
+        
+        private readonly string _tokenFileName;
+        private TokenListConfig _tokenList = null!;
 
         public TokenObserverService(
             string chainName,
@@ -53,6 +52,8 @@ namespace AnalyzerCore.Services
             _chainDataHandler = chainDataHandler;
             _tokenAddressToCompareWith = addressesToCompare;
             _baseUri = baseUri;
+            _tokenFileName = tokenFileName;
+            
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -64,14 +65,6 @@ namespace AnalyzerCore.Services
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
-
-            // Load configuration regarding tokens
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile(tokenFileName, false, true)
-                .Build();
-            _tokenList = _configuration.Get<TokenListConfig>();
-            _missingTokens = new ConcurrentDictionary<string, Token>();
         }
 
         public void OnCompleted()
@@ -86,6 +79,14 @@ namespace AnalyzerCore.Services
 
         public void OnNext(DataCollectorService.ChainData chainData)
         {
+            _telegramNotifier.SendMessage("Reloading Tokens...");
+            // Load configuration regarding tokens
+            _configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile(_tokenFileName, false, true)
+                .Build();
+            _missingTokens = new ConcurrentDictionary<string, Token>();
+            
             _log.Information("New Data Received");
             if (chainData.Transactions.Count <= 0) return;
             _tokenList = _configuration.Get<TokenListConfig>();
@@ -160,8 +161,8 @@ namespace AnalyzerCore.Services
                 _log.Debug($"Called AnalyzeSyncEvent on {contractHandler.ContractAddress}");
                 var token0OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                if (_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
-                    _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1))
+                if ((_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
+                     _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1)))
                 {
                     _log.Debug($"Token: {token0OutputDto.ReturnValue1} already known");
                 }
@@ -172,8 +173,8 @@ namespace AnalyzerCore.Services
 
                 var token1OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                if (_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
-                    _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1))
+                if ((_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
+                     _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1)))
                 {
                     _log.Debug($"Token: {token1OutputDto.ReturnValue1} already known");
                 }
@@ -220,22 +221,23 @@ namespace AnalyzerCore.Services
                 else
                 {
                     // Create the object inside the dictionary since it's the first time that we see it
-                    _missingTokens[token] = new Token
-                    {
-                        PoolFactory = factory,
-                        TokenAddress = token,
-                        TransactionHashes = new List<string>(),
-                        TokenSymbol = tokenSymbol,
-                        TokenTotalSupply = tokenTotalSupply,
-                        IsDeflationary = false,
-                        TxCount = 1,
-                        From = t.Transaction.From,
-                        To = t.Transaction.To,
-                    };
+                    if (_missingTokens != null)
+                        _missingTokens[token] = new Token
+                        {
+                            PoolFactory = factory,
+                            TokenAddress = token,
+                            TransactionHashes = new List<string>(),
+                            TokenSymbol = tokenSymbol,
+                            TokenTotalSupply = tokenTotalSupply,
+                            IsDeflationary = false,
+                            TxCount = 1,
+                            From = t.Transaction.From,
+                            To = t.Transaction.To,
+                        };
                 }
 
                 _log.Information(
-                    $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens[token].TxCount.ToString()}");
+                    $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens?[token].TxCount.ToString()}");
             }
             catch (Exception ex)
             {
@@ -246,8 +248,8 @@ namespace AnalyzerCore.Services
 
         private void NotifyMissingTokens()
         {
-            _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
-            if (_missingTokens.Count <= 0)
+            _log.Debug($"MissingTokens: {_missingTokens?.Count.ToString()}");
+            if (_missingTokens!.Count <= 0)
             {
                 _log.Information("No Missing token found this time");
                 return;
@@ -298,7 +300,7 @@ namespace AnalyzerCore.Services
 
         private void Unsubscribe()
         {
-            _cancellation?.Dispose();
+            _cancellation.Dispose();
         }
     }
 }

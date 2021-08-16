@@ -29,7 +29,6 @@ namespace AnalyzerCore
                 .CreateLogger();
             
             
-            // 0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9 <- new pair created
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -87,7 +86,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Ply.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "PolygonChain",
                                     analyzerConfig.Ply.RpcEndpoint,
@@ -105,7 +104,7 @@ namespace AnalyzerCore
                             new DataCollectorService.ChainDataHandler();
                         if (analyzerConfig.Bsc.ServicesConfig.AnalyzerService)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new AnalyzerService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.Enemies,
@@ -121,7 +120,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Bsc.ServicesConfig.TokenAnalyzer)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new TokenObserverService(
                                     chainName: "BinanceSmartChain",
                                     telegramNotifier: new TelegramNotifier(
@@ -140,7 +139,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Bsc.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.RpcEndpoint,
