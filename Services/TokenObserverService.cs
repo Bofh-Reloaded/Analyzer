@@ -219,8 +219,8 @@ namespace AnalyzerCore.Services
                         _missingTokens[token].TxCount++;
                         _missingTokens[token].From = t.Transaction.From;
                         _missingTokens[token].To = t.Transaction.To;
-                        _missingTokens[token].ExchangesList.Add(exchangeAddress);
-                        _missingTokens[token].PoolsList.Add(poolAddress);
+                        if (!_missingTokens[token].ExchangesList.Contains(exchangeAddress)) _missingTokens[token].ExchangesList.Add(exchangeAddress);
+                        if (!_missingTokens[token].ExchangesList.Contains(poolAddress)) _missingTokens[token].PoolsList.Add(poolAddress);
                     }
                 }
                 else
