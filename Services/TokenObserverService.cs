@@ -36,7 +36,7 @@ namespace AnalyzerCore.Services
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
         private IDisposable _cancellation = null!;
-        
+
         private readonly string _tokenFileName;
         private TokenListConfig _tokenList = null!;
 
@@ -53,7 +53,7 @@ namespace AnalyzerCore.Services
             _tokenAddressToCompareWith = addressesToCompare;
             _baseUri = baseUri;
             _tokenFileName = tokenFileName;
-            
+
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -86,13 +86,14 @@ namespace AnalyzerCore.Services
                 .AddJsonFile(_tokenFileName, false, true)
                 .Build();
             _missingTokens = new ConcurrentDictionary<string, Token>();
-            
+
             _log.Information("New Data Received");
             if (chainData.Transactions.Count <= 0) return;
             _tokenList = _configuration.Get<TokenListConfig>();
             _tokenList.blacklisted ??= new List<string>();
 
-            _log.Information($"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
+            _log.Information(
+                $"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t =>
@@ -137,6 +138,7 @@ namespace AnalyzerCore.Services
                                     tokenSymbol.Result,
                                     tokenTotalSupply.Result,
                                     t.Transaction.TransactionHash,
+                                    contractHandler.ContractAddress,
                                     poolFactory.Result,
                                     t);
                             }
@@ -193,7 +195,8 @@ namespace AnalyzerCore.Services
         }
 
         private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash,
-            string factory, DataCollectorService.ChainData.EnTransaction t)
+            string poolAddress,
+            string exchangeAddress, DataCollectorService.ChainData.EnTransaction t)
         {
             try
             {
@@ -216,28 +219,32 @@ namespace AnalyzerCore.Services
                         _missingTokens[token].TxCount++;
                         _missingTokens[token].From = t.Transaction.From;
                         _missingTokens[token].To = t.Transaction.To;
+                        _missingTokens[token].ExchangesList.Add(exchangeAddress);
+                        _missingTokens[token].PoolsList.Add(poolAddress);
                     }
                 }
                 else
                 {
                     // Create the object inside the dictionary since it's the first time that we see it
-                    if (_missingTokens != null)
-                        _missingTokens[token] = new Token
-                        {
-                            PoolFactory = factory,
-                            TokenAddress = token,
-                            TransactionHashes = new List<string>(),
-                            TokenSymbol = tokenSymbol,
-                            TokenTotalSupply = tokenTotalSupply,
-                            IsDeflationary = false,
-                            TxCount = 1,
-                            From = t.Transaction.From,
-                            To = t.Transaction.To,
-                        };
+                    _missingTokens[token] = new Token
+                    {
+                        ExchangesList = new List<string>(),
+                        TokenAddress = token,
+                        TransactionHashes = new List<string>(),
+                        TokenSymbol = tokenSymbol,
+                        TokenTotalSupply = tokenTotalSupply,
+                        IsDeflationary = false,
+                        TxCount = 1,
+                        From = t.Transaction.From,
+                        To = t.Transaction.To,
+                        PoolsList = new List<string>()
+                    };
+                    _missingTokens[token].ExchangesList.Add(exchangeAddress);
+                    _missingTokens[token].PoolsList.Add(poolAddress);
                 }
 
                 _log.Information(
-                    $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens?[token].TxCount.ToString()}");
+                    $"Found missing Token: {token} with TxHash: {txHash} with {_missingTokens[token].ExchangesList.Count} pools, total txCount: {_missingTokens[token].TxCount.ToString()}");
             }
             catch (Exception ex)
             {
@@ -248,8 +255,8 @@ namespace AnalyzerCore.Services
 
         private void NotifyMissingTokens()
         {
-            _log.Debug($"MissingTokens: {_missingTokens?.Count.ToString()}");
-            if (_missingTokens!.Count <= 0)
+            _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
+            if (_missingTokens.Count <= 0)
             {
                 _log.Information("No Missing token found this time");
                 return;
@@ -264,11 +271,13 @@ namespace AnalyzerCore.Services
                         string.Join(
                             Environment.NewLine,
                             $"<b>{t.TokenSymbol} [{t.TokenAddress}]:</b>",
-                            $"  isDeflationary: {t.IsDeflationary.ToString()}",
+                            $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                             $"  totalTxCount: {t.TxCount.ToString()}",
-                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..8]}...{t.GetLatestTxHash()[^8..]}</a>",
-                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..6]}...{t.From[^6..]}</a>",
-                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
+                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
+                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                            $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                            $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
                         )))
             {
                 _telegramNotifier.SendMessage(tFound);

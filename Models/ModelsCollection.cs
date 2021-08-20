@@ -59,7 +59,7 @@ namespace AnalyzerCore.Models
         {
             return TransactionHashes.Count > 0 ? TransactionHashes.Last() : "00000000000000000000000000000000";
         }
-        public string PoolFactory { get; set; }
+        public List<string> ExchangesList { get; set; }
         [JsonProperty]
         public string TokenSymbol { get; set; }
         [JsonProperty]
@@ -68,5 +68,6 @@ namespace AnalyzerCore.Models
         public int TxCount { get; set; }
         public string From { get; set; }
         public string To { get; set; }
+        public List<string> PoolsList { get; set; }
     }
 }

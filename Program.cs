@@ -131,6 +131,7 @@ namespace AnalyzerCore
                                     {
                                         "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
                                         "0x0b8e1cbb1376c2538ca4239df5bfda60bba31710",
+                                        "0x5a4dbcb37bfe02d869e437ce63750602c7428256"
                                     },
                                     "bsc_tokenlists.data",
                                     "https://www.bscscan.com/")
