@@ -1,17 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using AnalyzerCore.Services;
-using log4net;
-using log4net.Config;
-using log4net.Core;
-using log4net.Repository.Hierarchy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore
 {
@@ -19,12 +17,18 @@ namespace AnalyzerCore
     {
         private static void Main(string[] args)
         {
-            var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-            XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
+            var Log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
             
             
-            // 0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9 <- new pair created
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -82,7 +86,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Ply.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "PolygonChain",
                                     analyzerConfig.Ply.RpcEndpoint,
@@ -100,7 +104,7 @@ namespace AnalyzerCore
                             new DataCollectorService.ChainDataHandler();
                         if (analyzerConfig.Bsc.ServicesConfig.AnalyzerService)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new AnalyzerService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.Enemies,
@@ -116,7 +120,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Bsc.ServicesConfig.TokenAnalyzer)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new TokenObserverService(
                                     chainName: "BinanceSmartChain",
                                     telegramNotifier: new TelegramNotifier(
@@ -127,6 +131,7 @@ namespace AnalyzerCore
                                     {
                                         "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
                                         "0x0b8e1cbb1376c2538ca4239df5bfda60bba31710",
+                                        "0x5a4dbcb37bfe02d869e437ce63750602c7428256"
                                     },
                                     "bsc_tokenlists.data",
                                     "https://www.bscscan.com/")
@@ -135,7 +140,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Bsc.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.RpcEndpoint,

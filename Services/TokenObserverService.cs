@@ -5,14 +5,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using log4net;
+using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
+using Serilog.Context;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore.Services
 {
@@ -21,22 +23,22 @@ namespace AnalyzerCore.Services
         private const string SyncEventAddress = "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private const int TaskDelayMs = 60000;
+        private readonly string _baseUri;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
-        private readonly string _baseUri;
 
         // Initialize configuration accessor
-        private readonly IConfigurationRoot? _configuration;
+        private IConfigurationRoot? _configuration;
 
-        // Initialize Logger
-        private readonly ILog _log;
+        private readonly Serilog.Core.Logger _log;
 
-        private readonly ConcurrentDictionary<string, Token> _missingTokens;
+        private ConcurrentDictionary<string, Token> _missingTokens = null!;
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
-        private IDisposable? _cancellation;
+        private IDisposable _cancellation = null!;
 
-        private TokenListConfig _tokenList;
+        private readonly string _tokenFileName;
+        private TokenListConfig _tokenList = null!;
 
         public TokenObserverService(
             string chainName,
@@ -50,14 +52,19 @@ namespace AnalyzerCore.Services
             _chainDataHandler = chainDataHandler;
             _tokenAddressToCompareWith = addressesToCompare;
             _baseUri = baseUri;
-            _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
-            // Load configuration regarding tokens
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile(tokenFileName, false, true)
-                .Build();
-            _tokenList = _configuration.Get<TokenListConfig>();
-            _missingTokens = new ConcurrentDictionary<string, Token>();
+            _tokenFileName = tokenFileName;
+
+            _log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+            LogContext.PushProperty("SourceContext", $"{_chainName}");
         }
 
         public void OnCompleted()
@@ -72,12 +79,21 @@ namespace AnalyzerCore.Services
 
         public void OnNext(DataCollectorService.ChainData chainData)
         {
-            _log.Info("New Data Received");
+            _telegramNotifier.SendMessage("Reloading Tokens...");
+            // Load configuration regarding tokens
+            _configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile(_tokenFileName, false, true)
+                .Build();
+            _missingTokens = new ConcurrentDictionary<string, Token>();
+
+            _log.Information("New Data Received");
             if (chainData.Transactions.Count <= 0) return;
             _tokenList = _configuration.Get<TokenListConfig>();
             _tokenList.blacklisted ??= new List<string>();
 
-            _log.Info($"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
+            _log.Information(
+                $"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t =>
@@ -97,7 +113,7 @@ namespace AnalyzerCore.Services
                             contract => contract["address"].ToString()
                         )
                         .Select(contractAddress => chainData.Web3.Eth.GetContractHandler(contractAddress)),
-                     contractHandler =>
+                    contractHandler =>
                     {
                         try
                         {
@@ -112,7 +128,8 @@ namespace AnalyzerCore.Services
                                 var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
                                 var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
                                 tokenSymbol.Wait();
-                                var tokenTotalSupply = tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                                var tokenTotalSupply =
+                                    tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
                                 tokenTotalSupply.Wait();
                                 _log.Debug(
                                     $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory}");
@@ -121,6 +138,7 @@ namespace AnalyzerCore.Services
                                     tokenSymbol.Result,
                                     tokenTotalSupply.Result,
                                     t.Transaction.TransactionHash,
+                                    contractHandler.ContractAddress,
                                     poolFactory.Result,
                                     t);
                             }
@@ -133,7 +151,7 @@ namespace AnalyzerCore.Services
                     });
             }
 
-            _log.Info("Analysis complete");
+            _log.Information("Analysis complete");
             NotifyMissingTokens();
         }
 
@@ -145,8 +163,8 @@ namespace AnalyzerCore.Services
                 _log.Debug($"Called AnalyzeSyncEvent on {contractHandler.ContractAddress}");
                 var token0OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                if (_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
-                    _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1))
+                if ((_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
+                     _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1)))
                 {
                     _log.Debug($"Token: {token0OutputDto.ReturnValue1} already known");
                 }
@@ -157,8 +175,8 @@ namespace AnalyzerCore.Services
 
                 var token1OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                if (_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
-                    _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1))
+                if ((_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
+                     _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1)))
                 {
                     _log.Debug($"Token: {token1OutputDto.ReturnValue1} already known");
                 }
@@ -177,7 +195,8 @@ namespace AnalyzerCore.Services
         }
 
         private void EvaluateToken(string token, string tokenSymbol, BigInteger tokenTotalSupply, string txHash,
-            string factory, DataCollectorService.ChainData.EnTransaction t)
+            string poolAddress,
+            string exchangeAddress, DataCollectorService.ChainData.EnTransaction t)
         {
             try
             {
@@ -187,7 +206,7 @@ namespace AnalyzerCore.Services
                     // Token exists, check if the supply is changed
                     if (tokenTotalSupply < _missingTokens[token].TokenTotalSupply)
                     {
-                        _log.Info(
+                        _log.Information(
                             $"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
                         _missingTokens[token].IsDeflationary = true;
                     }
@@ -200,6 +219,8 @@ namespace AnalyzerCore.Services
                         _missingTokens[token].TxCount++;
                         _missingTokens[token].From = t.Transaction.From;
                         _missingTokens[token].To = t.Transaction.To;
+                        if (!_missingTokens[token].ExchangesList.Contains(exchangeAddress)) _missingTokens[token].ExchangesList.Add(exchangeAddress);
+                        if (!_missingTokens[token].ExchangesList.Contains(poolAddress)) _missingTokens[token].PoolsList.Add(poolAddress);
                     }
                 }
                 else
@@ -207,7 +228,7 @@ namespace AnalyzerCore.Services
                     // Create the object inside the dictionary since it's the first time that we see it
                     _missingTokens[token] = new Token
                     {
-                        PoolFactory = factory,
+                        ExchangesList = new List<string>(),
                         TokenAddress = token,
                         TransactionHashes = new List<string>(),
                         TokenSymbol = tokenSymbol,
@@ -216,15 +237,18 @@ namespace AnalyzerCore.Services
                         TxCount = 1,
                         From = t.Transaction.From,
                         To = t.Transaction.To,
+                        PoolsList = new List<string>()
                     };
+                    _missingTokens[token].ExchangesList.Add(exchangeAddress);
+                    _missingTokens[token].PoolsList.Add(poolAddress);
                 }
 
-                _log.Info(
-                    $"Found missing Token: {token} with TxHash: {txHash} within Pool: {factory}, total txCount: {_missingTokens[token].TxCount.ToString()}");
+                _log.Information(
+                    $"Found missing Token: {token} with TxHash: {txHash} with {_missingTokens[token].ExchangesList.Count} pools, total txCount: {_missingTokens[token].TxCount.ToString()}");
             }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                _log.Error(ex.Message);
                 throw;
             }
         }
@@ -234,10 +258,10 @@ namespace AnalyzerCore.Services
             _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
             if (_missingTokens.Count <= 0)
             {
-                _log.Info("No Missing token found this time");
+                _log.Information("No Missing token found this time");
                 return;
             }
-            
+
             foreach (var tFound in _missingTokens.Values
                 .ToList()
                 .OrderBy(o => o.TxCount)
@@ -247,11 +271,13 @@ namespace AnalyzerCore.Services
                         string.Join(
                             Environment.NewLine,
                             $"<b>{t.TokenSymbol} [{t.TokenAddress}]:</b>",
-                            $"  isDeflationary: {t.IsDeflationary.ToString()}",
+                            $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                             $"  totalTxCount: {t.TxCount.ToString()}",
-                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.TransactionHashes.Last()}'>{t.TransactionHashes.Last()[..8]}...{t.TransactionHashes.Last()[^8..]}</a>",
-                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..6]}...{t.From[^6..]}</a>",
-                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..6]}...{t.To[^6..]}</a>"
+                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
+                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                            $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                            $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
                         )))
             {
                 _telegramNotifier.SendMessage(tFound);
@@ -260,12 +286,12 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Info($"Starting TokenObserverService for chain: {_chainName}");
+            _log.Information($"Starting TokenObserverService for chain: {_chainName}");
             _telegramNotifier.SendMessage($"Starting TokenObserverService for chain: {_chainName}");
             stoppingToken.Register(() =>
                 {
                     Unsubscribe();
-                    _log.Info($"TokenObserverService background task is stopping for chain: {_chainName}");
+                    _log.Information($"TokenObserverService background task is stopping for chain: {_chainName}");
                 }
             );
 
@@ -283,7 +309,7 @@ namespace AnalyzerCore.Services
 
         private void Unsubscribe()
         {
-            _cancellation?.Dispose();
+            _cancellation.Dispose();
         }
     }
 }
