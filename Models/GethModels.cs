@@ -66,21 +66,26 @@ public static class OpCodes
 }
 
 public partial class Token0Function : Token0FunctionBase
-{}
+{
+}
 
 [Function("token0", "address")]
 public class Token0FunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class Token1Function : Token1FunctionBase
-{}
+{
+}
 
 [Function("token1", "address")]
 public class Token1FunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class Token0OutputDTO : Token0OutputDTOBase
-{}
+{
+}
 
 [FunctionOutput]
 public class Token0OutputDTOBase : IFunctionOutputDTO
@@ -89,7 +94,8 @@ public class Token0OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class Token1OutputDTO : Token1OutputDTOBase
-{}
+{
+}
 
 [FunctionOutput]
 public class Token1OutputDTOBase : IFunctionOutputDTO
@@ -98,21 +104,26 @@ public class Token1OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class FactoryFunction : FactoryFunctionBase
-{}
+{
+}
 
 [Function("factory", "address")]
 public class FactoryFunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class TotalSupplyFunction : TotalSupplyFunctionBase
-{}
+{
+}
 
 [Function("totalSupply", "uint256")]
 public class TotalSupplyFunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class TransferEventDTO : TransferEventDTOBase
-{}
+{
+}
 
 [Event("Transfer")]
 public class TransferEventDTOBase : IEventDTO
@@ -126,10 +137,28 @@ public class TransferEventDTOBase : IEventDTO
     public virtual BigInteger Value { get; set; }
 }
 
-public partial class SymbolFunction : SymbolFunctionBase { }
+public partial class SymbolFunction : SymbolFunctionBase
+{
+}
 
 [Function("symbol", "string")]
 public class SymbolFunctionBase : FunctionMessage
 {
+}
 
+public partial class PairCreatedEventDTO : PairCreatedEventDTOBase
+{
+}
+
+[Event("PairCreated")]
+public class PairCreatedEventDTOBase : IEventDTO
+{
+    [Parameter("address", "_token0", 1, true)]
+    public virtual string Token0 { get; set; }
+
+    [Parameter("address", "_token1", 2, true)]
+    public virtual string Token1 { get; set; }
+
+    [Parameter("address", "_pair", 3, false)]
+    public virtual string Pair { get; set; }
 }

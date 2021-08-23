@@ -17,7 +17,7 @@ namespace AnalyzerCore
     {
         private static void Main(string[] args)
         {
-            var Log = new LoggerConfiguration()
+            var log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
@@ -27,8 +27,7 @@ namespace AnalyzerCore
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
-            
-            
+
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -46,7 +45,6 @@ namespace AnalyzerCore
                         // Map json configuration inside Object
                         var section = configuration.GetSection(nameof(AnalyzerConfig));
                         var analyzerConfig = section.Get<AnalyzerConfig>();
-
 
                         // Poly
                         var plyAllAddresses = analyzerConfig.Ply.Enemies;
@@ -78,7 +76,8 @@ namespace AnalyzerCore
                                         "-532850503",
                                         "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     chainDataHandler: plyDataHandler,
-                                    addressesToCompare: new List<string> {"0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178"},
+                                    addressesToCompare: new List<string>
+                                        { "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178" },
                                     "ply_tokenlists.data",
                                     "https://polygonscan.com/")
                             );

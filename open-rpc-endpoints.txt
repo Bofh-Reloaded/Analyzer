@@ -1,8 +1,0 @@
-admin@CF02:~$ geth attach http://13.250.53.181:8545 --exec net.peerCount
-275
-
-
-
-Heco:
-
-188.40.85.49
