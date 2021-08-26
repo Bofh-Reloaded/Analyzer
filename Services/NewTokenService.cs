@@ -1,15 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using AnalyzerCore.Models;
+using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts;
 using Nethereum.JsonRpc.Client.Streaming;
 using Nethereum.JsonRpc.WebSocketStreamingClient;
 using Nethereum.RPC.Reactive.Eth.Subscriptions;
-using Newtonsoft.Json;
+using Nethereum.Web3;
 using Serilog;
+using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using Telegram.Bot;
+using Telegram.Bot.Types.Enums;
 
 namespace AnalyzerCore.Services
 {
@@ -18,11 +25,12 @@ namespace AnalyzerCore.Services
         private readonly string _wssUri;
         private readonly Logger _log;
 
-        public static string NewPairEvent { get; } =
+        private static string NewPairEvent { get; } =
             "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
 
-        public NewTokenService()
+        public NewTokenService(string chainName)
         {
+            _chainName = chainName;
             _wssUri = "wss://bsc-ws-node.nariox.org:443";
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -34,73 +42,108 @@ namespace AnalyzerCore.Services
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
+            LogContext.PushProperty("SourceContext", $"{_chainName}");
             _log.Information("Starting Service");
+        }
+        
+        private static readonly TelegramBotClient Bot =
+            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
+
+        private static readonly string TelegramChatId = "-560874043";
+        private static readonly string TokenFileName = "bsc_tokenlists.data";
+        private readonly string _chainName;
+
+        private static string GetLinkFromElement(string element, string type = "token")
+        {
+            var baseUri = $"https://bscscan.com/{type}";
+            return $"<a href='{baseUri}/{element}'>{element[..10]}...{element[^10..]}</a>{Environment.NewLine}";
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _log.Information($"Starting cycle, wss: {_wssUri}");
 
-            using (var client = new StreamingWebSocketClient(_wssUri))
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var filterPairCreated = Event<PairCreatedEventDTO>.GetEventABI().CreateFilterInput();
+                // Load configuration regarding tokens
+                var configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                    .AddJsonFile(TokenFileName, false, true)
+                    .Build();
+                var tokenList = configuration.Get<TokenListConfig>();
+                tokenList.blacklisted ??= new List<string>();
+                using var client = new StreamingWebSocketClient("ws://195.201.169.14:8546");
+                // create a log filter specific to Transfers
+                // this filter will match any Transfer (matching the signature) regardless of address
+                var filterTransfers = Event<PairCreatedEvent>.GetEventABI().CreateFilterInput();
+                filterTransfers.Topics[0] = NewPairEvent;
 
                 // create the subscription
-                // (it won't start receiving data until Subscribe is called)
-                var subscription = new EthNewBlockHeadersObservableSubscription(client);
+                // it won't do anything yet
+                var subscription = new EthLogsObservableSubscription(client);
 
-                // attach a handler for when the subscription is first created (optional)
-                // this will occur once after Subscribe has been called
-                subscription.GetSubscribeResponseAsObservable().Subscribe(subscriptionId =>
-                    Console.WriteLine("Block Header subscription Id: " + subscriptionId));
+                subscription.GetSubscribeResponseAsObservable()
+                    .Subscribe(s => _log.Information($"Subscription Id: {s}"));
 
-                subscription.GetSubscriptionDataResponsesAsObservable().Subscribe(transactionHash =>
+                // attach a handler for Transfer event logs
+                subscription.GetSubscriptionDataResponsesAsObservable().Subscribe(async log =>
                 {
-                    _log.Information(transactionHash.ToString());
+                    try
+                    {
+                        _log.Information("Topics: " + log.GetTopic(0) + " txhash: " + log.TransactionHash);
+                        if (log.GetTopic(0) != NewPairEvent) return;
+                        var token1 = log.Topics[1].ToString()?.Replace("0x000000000000000000000000", "0x");
+                        var token2 = log.Topics[2].ToString()?.Replace("0x000000000000000000000000", "0x");
+                        var pool = log.Data.Replace("0x000000000000000000000000", "0x")[..42];
+                        var token1Flag = false;
+                        var token2Flag = false;
+                        if (token1 == null || token2 == null) return;
+                        if (tokenList.whitelisted.Contains(token1.ToLower()) ||
+                            tokenList.blacklisted.Contains(token1.ToLower())) token1Flag = true;
+                        if (tokenList.whitelisted.Contains(token2.ToLower()) ||
+                            tokenList.blacklisted.Contains(token2.ToLower())) token2Flag = true;
+                        if (token1Flag && token2Flag) return;
+                        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                        var web3 = new Web3("http://162.55.98.218:8545");
+                        var token1ContractHandler = web3.Eth.GetContractHandler(token1);
+                        var token2ContractHandler = web3.Eth.GetContractHandler(token2);
+                        var poolContractHandler = web3.Eth.GetContractHandler(pool);
+                        var token1Symbol = token1ContractHandler.QueryAsync<SymbolFunction, string>();
+                        token1Symbol.Wait(stoppingToken);
+                        var token2Symbol = token2ContractHandler.QueryAsync<SymbolFunction, string>();
+                        token2Symbol.Wait(stoppingToken);
+                        var poolSymbol = poolContractHandler.QueryAsync<SymbolFunction, string>();
+                        poolSymbol.Wait(stoppingToken);
+                        var exchange = poolContractHandler.QueryAsync<FactoryFunction, string>();
+                        exchange.Wait(stoppingToken);
+                        var exchangeContractHandler = web3.Eth.GetContractHandler(exchange.Result);
+                        await Bot.SendTextMessageAsync(
+                            chatId: TelegramChatId,
+                            text: $"<b>New PairCreated Event</b>{Environment.NewLine}" +
+                                  $"Token1: <b>[{token1Symbol.Result}]:</b> {GetLinkFromElement(token1)}" +
+                                  $"Token2: <b>[{token2Symbol.Result}]:</b> {GetLinkFromElement(token2)}" +
+                                  $"Pool: <b>[{poolSymbol.Result}]:</b> {GetLinkFromElement(pool)}" +
+                                  $"Exchange: <b>[]:</b> {GetLinkFromElement(exchange.Result, "address")}",
+                            parseMode: ParseMode.Html,
+                            disableWebPagePreview: true, cancellationToken: stoppingToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error(ex.ToString());
+                    }
                 });
-                DateTime? lastBlockNotification = null;
-                double secondsSinceLastBlock = 0;
 
-                // attach a handler for each block
-                // put your logic here
-                subscription.GetSubscriptionDataResponsesAsObservable().Subscribe(block =>
-                {
-                    secondsSinceLastBlock = (lastBlockNotification == null)
-                        ? 0
-                        : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
-                    lastBlockNotification = DateTime.Now;
-                    var utcTimestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value);
-                    Console.WriteLine(
-                        $"New Block. Number: {block.Number.Value}, Timestamp UTC: {JsonConvert.SerializeObject(utcTimestamp)}, Seconds since last block received: {secondsSinceLastBlock} ");
-                });
-
-                bool subscribed = true;
-
-                // handle unsubscription
-                // optional - but may be important depending on your use case
-                subscription.GetUnsubscribeResponseAsObservable().Subscribe(response =>
-                {
-                    subscribed = false;
-                    Console.WriteLine("Block Header unsubscribe result: " + response);
-                });
-
-                // open the websocket connection
+                // open the web socket connection
                 await client.StartAsync();
 
-                // start the subscription
-                // this will only block long enough to register the subscription with the client
-                // once running - it won't block whilst waiting for blocks
-                // blocks will be delivered to our handler on another thread
-                await subscription.SubscribeAsync();
+                // begin receiving subscription data
+                // data will be received on a background thread
+                await subscription.SubscribeAsync(filterTransfers);
 
-                // run for a minute before unsubscribing
-                await Task.Delay(TimeSpan.FromMinutes(1));
-
-                // unsubscribe
-                await subscription.UnsubscribeAsync();
-
-                //allow time to unsubscribe
-                while (subscribed) await Task.Delay(TimeSpan.FromSeconds(1));
+                while (subscription.SubscriptionState == SubscriptionState.Subscribing || subscription.SubscriptionState == SubscriptionState.Subscribed)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                }
             }
         }
     }

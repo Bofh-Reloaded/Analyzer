@@ -15,6 +15,8 @@ namespace AnalyzerCore.Models
         [JsonProperty("AnalyzerService")] public bool AnalyzerService { get; set; }
 
         [JsonProperty("TokenAnalyzer")] public bool TokenAnalyzer { get; set; }
+        
+        [JsonProperty("NewTokenService")] public bool NewTokenService { get; set; }
 
         [JsonProperty("MaxParallelism")] public int MaxParallelism { get; set; }
     }
