@@ -9,9 +9,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
+using Json.Net;
 using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
+using Newtonsoft.Json;
 using Serilog.Context;
 using Serilog.Events;
 using Serilog.Exceptions;
@@ -61,6 +63,7 @@ namespace AnalyzerCore.Services
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
+                    restrictedToMinimumLevel: LogEventLevel.Information,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
@@ -93,7 +96,7 @@ namespace AnalyzerCore.Services
             _tokenList.blacklisted ??= new List<string>();
 
             _log.Information(
-                $"Analyzing addresses: {string.Join(Environment.NewLine, _tokenAddressToCompareWith.ToArray())}");
+                $"Analyzing addresses:{Environment.NewLine}{JsonConvert.SerializeObject(_tokenAddressToCompareWith, Formatting.Indented)}");
             // Select only transaction from the address that we need analyze
             var transactionsToAnalyze = chainData.Transactions
                 .Where(t =>
@@ -219,8 +222,14 @@ namespace AnalyzerCore.Services
                         _missingTokens[token].TxCount++;
                         _missingTokens[token].From = t.Transaction.From;
                         _missingTokens[token].To = t.Transaction.To;
-                        if (!_missingTokens[token].ExchangesList.Contains(exchangeAddress)) _missingTokens[token].ExchangesList.Add(exchangeAddress);
-                        if (!_missingTokens[token].ExchangesList.Contains(poolAddress)) _missingTokens[token].PoolsList.Add(poolAddress);
+                        if (!_missingTokens[token]
+                            .ExchangesList.Contains(exchangeAddress.ToLower()))
+                            _missingTokens[token]
+                                .ExchangesList.Add(exchangeAddress.ToLower());
+                        if (!_missingTokens[token]
+                            .PoolsList.Contains(poolAddress.ToLower()))
+                            _missingTokens[token]
+                                .PoolsList.Add(poolAddress.ToLower());
                     }
                 }
                 else
@@ -239,8 +248,8 @@ namespace AnalyzerCore.Services
                         To = t.Transaction.To,
                         PoolsList = new List<string>()
                     };
-                    _missingTokens[token].ExchangesList.Add(exchangeAddress);
-                    _missingTokens[token].PoolsList.Add(poolAddress);
+                    _missingTokens[token].ExchangesList.Add(exchangeAddress.ToLower());
+                    _missingTokens[token].PoolsList.Add(poolAddress.ToLower());
                 }
 
                 _log.Information(
@@ -259,6 +268,7 @@ namespace AnalyzerCore.Services
             if (_missingTokens.Count <= 0)
             {
                 _log.Information("No Missing token found this time");
+                _telegramNotifier.SendMessage("No Missing Tokens inside the analyzed transactions");
                 return;
             }
 
@@ -270,7 +280,7 @@ namespace AnalyzerCore.Services
                     t =>
                         string.Join(
                             Environment.NewLine,
-                            $"<b>{t.TokenSymbol} [{t.TokenAddress}]:</b>",
+                            $"<b>{t.TokenSymbol} [<a href='https://bscscan.com/token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
                             $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                             $"  totalTxCount: {t.TxCount.ToString()}",
                             $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",

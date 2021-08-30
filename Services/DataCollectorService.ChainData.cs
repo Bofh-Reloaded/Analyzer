@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,6 +41,7 @@ namespace AnalyzerCore.Services
                     .Enrich.WithThreadId()
                     .Enrich.WithExceptionDetails()
                     .WriteTo.Console(
+                        restrictedToMinimumLevel: LogEventLevel.Information,
                         outputTemplate: $"{{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}} [{{Level:u3}}] [DataCollector:{_chainName}] " +
                                         "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
@@ -70,9 +72,10 @@ namespace AnalyzerCore.Services
                         {
                             block.Wait(cancellationToken);
                         }
-                        catch (RpcClientTimeoutException)
+                        catch (Exception)
                         {
                             // Skip reading that block
+                            _log.Error($"Cannot retrieve block: {blockParameter}");
                             return;
                         }
                         _log.Information(

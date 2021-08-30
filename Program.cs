@@ -27,7 +27,7 @@ namespace AnalyzerCore
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
-
+            
             CreateHostBuilder(args).Build().Run();
         }
 

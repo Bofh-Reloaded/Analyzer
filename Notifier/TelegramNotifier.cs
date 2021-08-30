@@ -31,6 +31,7 @@ namespace AnalyzerCore.Notifier
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
+                    restrictedToMinimumLevel: LogEventLevel.Information,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
