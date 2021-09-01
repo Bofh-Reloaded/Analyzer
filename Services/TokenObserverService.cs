@@ -93,6 +93,8 @@ namespace AnalyzerCore.Services
             catch (Exception)
             {
                 _log.Error("Cannot load token file... skipping cycle");
+                _telegramNotifier.SendMessage(
+                    $"<b>Token file not present: {_tokenFileName}... I cannot check tokens \U0001F62D\U0001F62D\U0001F62D</b>");
                 return;
             }
 
