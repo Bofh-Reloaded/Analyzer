@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using Json.Net;
 using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
@@ -83,11 +82,20 @@ namespace AnalyzerCore.Services
         public void OnNext(DataCollectorService.ChainData chainData)
         {
             _telegramNotifier.SendMessage("Reloading Tokens...");
-            // Load configuration regarding tokens
-            _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile(_tokenFileName, false, true)
-                .Build();
+            try
+            {
+                // Load configuration regarding tokens
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                    .AddJsonFile(_tokenFileName, false, true)
+                    .Build();
+            }
+            catch (Exception)
+            {
+                _log.Error("Cannot load token file... skipping cycle");
+                return;
+            }
+
             _missingTokens = new ConcurrentDictionary<string, Token>();
 
             _log.Information("New Data Received");
