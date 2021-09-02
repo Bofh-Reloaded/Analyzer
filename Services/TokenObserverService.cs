@@ -28,18 +28,19 @@ namespace AnalyzerCore.Services
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
 
+        private readonly Serilog.Core.Logger _log;
+        private readonly TelegramNotifier _telegramNotifier;
+        private readonly List<string> _tokenAddressToCompareWith;
+
+        private readonly string _tokenFileName;
+        private IDisposable _cancellation = null!;
+
         // Initialize configuration accessor
         private IConfigurationRoot? _configuration;
 
-        private readonly Serilog.Core.Logger _log;
-
         private ConcurrentDictionary<string, Token> _missingTokens = null!;
-        private readonly TelegramNotifier _telegramNotifier;
-        private readonly List<string> _tokenAddressToCompareWith;
-        private IDisposable _cancellation = null!;
-
-        private readonly string _tokenFileName;
         private TokenListConfig _tokenList = null!;
+        private readonly List<string> _tokenNotified = new();
 
         public TokenObserverService(
             string chainName,
@@ -62,9 +63,9 @@ namespace AnalyzerCore.Services
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
-                    restrictedToMinimumLevel: LogEventLevel.Information,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
-                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                    LogEventLevel.Information,
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
         }
@@ -176,27 +177,19 @@ namespace AnalyzerCore.Services
                 _log.Debug($"Called AnalyzeSyncEvent on {contractHandler.ContractAddress}");
                 var token0OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token0Function, Token0OutputDTO>();
-                if ((_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
-                     _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1)))
-                {
+                if (_tokenList.whitelisted.Contains(token0OutputDto.ReturnValue1) ||
+                    _tokenList.blacklisted.Contains(token0OutputDto.ReturnValue1))
                     _log.Debug($"Token: {token0OutputDto.ReturnValue1} already known");
-                }
                 else
-                {
                     tokens.Add(token0OutputDto.ReturnValue1);
-                }
 
                 var token1OutputDto =
                     await contractHandler.QueryDeserializingToObjectAsync<Token1Function, Token1OutputDTO>();
-                if ((_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
-                     _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1)))
-                {
+                if (_tokenList.whitelisted.Contains(token1OutputDto.ReturnValue1) ||
+                    _tokenList.blacklisted.Contains(token1OutputDto.ReturnValue1))
                     _log.Debug($"Token: {token1OutputDto.ReturnValue1} already known");
-                }
                 else
-                {
                     tokens.Add(token1OutputDto.ReturnValue1);
-                }
 
                 return tokens;
             }
@@ -282,25 +275,24 @@ namespace AnalyzerCore.Services
                 return;
             }
 
-            foreach (var tFound in _missingTokens.Values
-                .ToList()
-                .OrderBy(o => o.TxCount)
-                .TakeLast(10)
-                .Select(
-                    t =>
-                        string.Join(
-                            Environment.NewLine,
-                            $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                            $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
-                            $"  totalTxCount: {t.TxCount.ToString()}",
-                            $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
-                            $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
-                            $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                            $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                            $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
-                        )))
+            foreach (var t in _missingTokens.Values.ToList().OrderBy(o => o.TxCount))
             {
-                _telegramNotifier.SendMessage(tFound);
+                // Skip Already Notified Tokens
+                if (_tokenNotified.Contains(t.TokenAddress)) continue;
+                var msg = string.Join(
+                    Environment.NewLine,
+                    $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
+                    $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
+                    $"  totalTxCount: {t.TxCount.ToString()}",
+                    $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
+                    $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                    $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                    $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                    $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
+                );
+
+                _telegramNotifier.SendMessage(msg);
+                _tokenNotified.Add(t.TokenAddress);
             }
         }
 
