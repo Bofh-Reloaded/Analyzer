@@ -40,7 +40,7 @@ namespace AnalyzerCore.Services
 
         private ConcurrentDictionary<string, Token> _missingTokens = null!;
         private TokenListConfig _tokenList = null!;
-        private readonly List<string> _tokenNotified = new();
+        private readonly List<string> _tokenNotified = new List<string>();
 
         public TokenObserverService(
             string chainName,
