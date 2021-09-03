@@ -214,6 +214,7 @@ namespace AnalyzerCore.Services
                         _log.Information(
                             $"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
                         _missingTokens[token].IsDeflationary = true;
+                        _missingTokens[token].TxCount++;
                     }
 
                     // Update token details if we haven't seen that trx yet
