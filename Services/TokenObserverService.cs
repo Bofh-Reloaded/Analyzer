@@ -279,9 +279,10 @@ namespace AnalyzerCore.Services
             {
                 // Skip Already Notified Tokens
                 if (_tokenNotified.Contains(t.TokenAddress)) continue;
+                const string star = "\U0001F303";
                 var msg = string.Join(
                     Environment.NewLine,
-                    $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
+                    $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
                     $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                     $"  totalTxCount: {t.TxCount.ToString()}",
                     $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
