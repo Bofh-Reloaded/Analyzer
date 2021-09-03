@@ -82,7 +82,6 @@ namespace AnalyzerCore.Services
 
         public void OnNext(DataCollectorService.ChainData chainData)
         {
-            _telegramNotifier.SendMessage("Reloading Tokens...");
             try
             {
                 // Load configuration regarding tokens
@@ -279,7 +278,7 @@ namespace AnalyzerCore.Services
             {
                 // Skip Already Notified Tokens
                 if (_tokenNotified.Contains(t.TokenAddress)) continue;
-                const string star = "\U0001F303";
+                const string star = "\U00002B50";
                 var msg = string.Join(
                     Environment.NewLine,
                     $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
