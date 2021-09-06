@@ -78,7 +78,7 @@ namespace AnalyzerCore
                                     chainDataHandler: plyDataHandler,
                                     addressesToCompare: new List<string>
                                         { "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178" },
-                                    "ply_tokenlists.data",
+                                    "polygon_tokenlists.data",
                                     "https://polygonscan.com/")
                             );
                         }
