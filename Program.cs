@@ -182,7 +182,7 @@ namespace AnalyzerCore
                                         "-516536036",
                                         "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                     chainDataHandler: hecoDataHandler,
-                                    analyzerConfig.Heco.Enemies,
+                                    addressesToCompare: analyzerConfig.Heco.Enemies,
                                     "heco_tokenlists.data",
                                     "https://hecoinfo.com/")
                             );
