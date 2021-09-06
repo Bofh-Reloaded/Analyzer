@@ -275,7 +275,7 @@ namespace AnalyzerCore.Services
                 return;
             }
 
-            foreach (var t in _missingTokens.Values.ToList().OrderBy(o => o.TxCount))
+            foreach (var t in _missingTokens.Values.ToList().OrderBy(o => o.TxCount).Reverse())
             {
                 // Skip Already Notified Tokens
                 if (_tokenNotified.Contains(t.TokenAddress)) continue;
