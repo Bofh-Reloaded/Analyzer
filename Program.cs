@@ -174,7 +174,7 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Heco.ServicesConfig.TokenAnalyzer)
                         {
-                            services.AddHostedService<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new TokenObserverService(
                                     chainName: "HecoChain",
                                     telegramNotifier: new TelegramNotifier(
