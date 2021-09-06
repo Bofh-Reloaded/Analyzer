@@ -76,8 +76,7 @@ namespace AnalyzerCore
                                         "-532850503",
                                         "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     chainDataHandler: plyDataHandler,
-                                    addressesToCompare: new List<string>
-                                        { "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178" },
+                                    addressesToCompare: analyzerConfig.Ply.Enemies,
                                     "polygon_tokenlists.data",
                                     "https://polygonscan.com/")
                             );
