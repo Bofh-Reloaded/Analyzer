@@ -1,17 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using AnalyzerCore.Services;
-using log4net;
-using log4net.Config;
-using log4net.Core;
-using log4net.Repository.Hierarchy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore
 {
@@ -19,10 +17,17 @@ namespace AnalyzerCore
     {
         private static void Main(string[] args)
         {
-            var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-            XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
-            ((Hierarchy) LogManager.GetRepository()).Root.Level = Level.Debug;
-
+            var log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+            
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -41,7 +46,6 @@ namespace AnalyzerCore
                         var section = configuration.GetSection(nameof(AnalyzerConfig));
                         var analyzerConfig = section.Get<AnalyzerConfig>();
 
-
                         // Poly
                         var plyAllAddresses = analyzerConfig.Ply.Enemies;
                         plyAllAddresses.Add(analyzerConfig.Ply.Address);
@@ -54,7 +58,8 @@ namespace AnalyzerCore
                                     "PolygonChain",
                                     analyzerConfig.Ply.Enemies,
                                     new TelegramNotifier(
-                                        "-532850503"),
+                                        "-532850503",
+                                        "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     5,
                                     analyzerConfig.Ply.Address,
                                     plyDataHandler
@@ -69,16 +74,18 @@ namespace AnalyzerCore
                                 _ => new TokenObserverService(
                                     chainName: "PolygonChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-532850503"),
+                                        "-532850503",
+                                        "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
                                     chainDataHandler: plyDataHandler,
-                                    addressesToCompare: new List<string> {"0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178"},
-                                    "ply_tokenlists.data")
+                                    addressesToCompare: analyzerConfig.Ply.Enemies,
+                                    "polygon_tokenlists.data",
+                                    "https://polygonscan.com/")
                             );
                         }
 
                         if (analyzerConfig.Ply.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "PolygonChain",
                                     analyzerConfig.Ply.RpcEndpoint,
@@ -96,12 +103,13 @@ namespace AnalyzerCore
                             new DataCollectorService.ChainDataHandler();
                         if (analyzerConfig.Bsc.ServicesConfig.AnalyzerService)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new AnalyzerService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.Enemies,
                                     new TelegramNotifier(
-                                        "-560874043"),
+                                        "-560874043",
+                                        "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
                                     5,
                                     analyzerConfig.Bsc.Address,
                                     bscDataHandler
@@ -111,30 +119,36 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Bsc.ServicesConfig.TokenAnalyzer)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new TokenObserverService(
                                     chainName: "BinanceSmartChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-560874043"),
+                                        "-556783420",
+                                        "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
                                     chainDataHandler: bscDataHandler,
-                                    addressesToCompare: new List<string>
-                                    {
-                                        "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178",
-                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856",
-                                    },
-                                    "bsc_tokenlists.data")
+                                    addressesToCompare: analyzerConfig.Bsc.Enemies,
+                                    "bsc_tokenlists.data",
+                                    "https://www.bscscan.com/")
                             );
                         }
 
                         if (analyzerConfig.Bsc.ServicesConfig.DataCollector)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new DataCollectorService(
                                     "BinanceSmartChain",
                                     analyzerConfig.Bsc.RpcEndpoint,
                                     analyzerConfig.Bsc.ServicesConfig.MaxParallelism,
                                     bscDataHandler,
                                     bscAllAddresses
+                                ));
+                        }
+
+                        if (analyzerConfig.Bsc.ServicesConfig.NewTokenService)
+                        {
+                            services.AddHostedService<NewTokenService>(
+                                _ => new NewTokenService(
+                                    "BinanceSmartChain"
                                 ));
                         }
 
@@ -150,7 +164,8 @@ namespace AnalyzerCore
                                     "HecoChain",
                                     analyzerConfig.Heco.Enemies,
                                     new TelegramNotifier(
-                                        "-516536036"),
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                     5,
                                     analyzerConfig.Heco.Address,
                                     hecoDataHandler
@@ -160,18 +175,16 @@ namespace AnalyzerCore
 
                         if (analyzerConfig.Heco.ServicesConfig.TokenAnalyzer)
                         {
-                            services.AddSingleton<IHostedService>(
+                            services.AddScoped<IHostedService>(
                                 _ => new TokenObserverService(
                                     chainName: "HecoChain",
                                     telegramNotifier: new TelegramNotifier(
-                                        "-516536036"),
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                     chainDataHandler: hecoDataHandler,
-                                    new List<string>
-                                    {
-                                        "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
-                                        "0xddafd3baab340b10c19c066ae52f96fe5bee1856"
-                                    },
-                                    "heco_tokenlists.data")
+                                    addressesToCompare: analyzerConfig.Heco.Enemies,
+                                    "heco_tokenlists.data",
+                                    "https://hecoinfo.com/")
                             );
                         }
 

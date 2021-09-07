@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
-using log4net;
+using Serilog;
+using Serilog.Context;
+using Serilog.Events;
+using Serilog.Exceptions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -12,21 +14,28 @@ namespace AnalyzerCore.Notifier
 {
     public class TelegramNotifier : ITelegramNotifier
     {
-        private static readonly ILog Log = LogManager.GetLogger(MethodBase.GetCurrentMethod()?.DeclaringType);
+        private static Serilog.Core.Logger _log;
 
-        private readonly TelegramBotClient _bot = new TelegramBotClient(
-            "1780013642:AAH2nN3rFtRFLQzh4dHd1gjNTdwGWFHrYL8"
-        );
+        private readonly TelegramBotClient _bot;
 
-        private readonly ChatId _chatId = new ChatId(identifier: -560874043);
+        private readonly ChatId _chatId;
 
-        public TelegramNotifier()
-        {
-        }
-
-        public TelegramNotifier(string chatId)
+        public TelegramNotifier(string chatId, string botToken)
         {
             _chatId = chatId;
+            _bot = new TelegramBotClient(botToken);
+            _log = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .Enrich.WithExceptionDetails()
+                .WriteTo.Console(
+                    restrictedToMinimumLevel: LogEventLevel.Information,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+            LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
         }
 
         public async void SendMessage(string text)
@@ -34,7 +43,7 @@ namespace AnalyzerCore.Notifier
 
             try
             {
-                Log.Debug(text);
+                _log.Debug(text);
                 await _bot.SendTextMessageAsync(
                     _chatId,
                     text,
@@ -44,7 +53,7 @@ namespace AnalyzerCore.Notifier
             }
             catch (Exception r)
             {
-                Log.Error(r);
+                _log.Error(r.Message);
             }
         }
 

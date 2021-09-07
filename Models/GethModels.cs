@@ -8,45 +8,9 @@ using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models.GethModels
 {
-    public class Log
-    {
-        public string address { get; set; }
-        public List<string> topics { get; set; }
-        public string data { get; set; }
-        public string blockNumber { get; set; }
-        public string transactionHash { get; set; }
-        public string transactionIndex { get; set; }
-        public string blockHash { get; set; }
-        public string logIndex { get; set; }
-        public bool removed { get; set; }
-    }
-
-    public class Result
-    {
-        public string blockHash { get; set; }
-        public string blockNumber { get; set; }
-        public object contractAddress { get; set; }
-        public string cumulativeGasUsed { get; set; }
-        public string from { get; set; }
-        public string gasUsed { get; set; }
-        public List<Log> logs { get; set; }
-        public string logsBloom { get; set; }
-        public string status { get; set; }
-        public string to { get; set; }
-        public string transactionHash { get; set; }
-        public string transactionIndex { get; set; }
-    }
-
-    public class TransactionReceipt
-    {
-        public string jsonrpc { get; set; }
-        public int id { get; set; }
-        public Result result { get; set; }
-    }
-
     public class TransactionReceiptJsonRequest
     {
-        [JsonProperty("jsonrpc")] public string Jsonrpc { get; set; }
+        [JsonProperty("jsonrpc")] public string JsonRpc { get; set; }
 
         [JsonProperty("method")] public string Method { get; set; }
 
@@ -66,21 +30,26 @@ public static class OpCodes
 }
 
 public partial class Token0Function : Token0FunctionBase
-{}
+{
+}
 
 [Function("token0", "address")]
 public class Token0FunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class Token1Function : Token1FunctionBase
-{}
+{
+}
 
 [Function("token1", "address")]
 public class Token1FunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class Token0OutputDTO : Token0OutputDTOBase
-{}
+{
+}
 
 [FunctionOutput]
 public class Token0OutputDTOBase : IFunctionOutputDTO
@@ -89,7 +58,8 @@ public class Token0OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class Token1OutputDTO : Token1OutputDTOBase
-{}
+{
+}
 
 [FunctionOutput]
 public class Token1OutputDTOBase : IFunctionOutputDTO
@@ -98,21 +68,26 @@ public class Token1OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class FactoryFunction : FactoryFunctionBase
-{}
+{
+}
 
 [Function("factory", "address")]
 public class FactoryFunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class TotalSupplyFunction : TotalSupplyFunctionBase
-{}
+{
+}
 
 [Function("totalSupply", "uint256")]
 public class TotalSupplyFunctionBase : FunctionMessage
-{}
+{
+}
 
 public partial class TransferEventDTO : TransferEventDTOBase
-{}
+{
+}
 
 [Event("Transfer")]
 public class TransferEventDTOBase : IEventDTO
@@ -126,10 +101,28 @@ public class TransferEventDTOBase : IEventDTO
     public virtual BigInteger Value { get; set; }
 }
 
-public partial class SymbolFunction : SymbolFunctionBase { }
+public partial class SymbolFunction : SymbolFunctionBase
+{
+}
 
 [Function("symbol", "string")]
 public class SymbolFunctionBase : FunctionMessage
 {
+}
 
+public class PairCreatedEvent : PairCreatedEventBase
+{
+}
+
+[Event("PairCreated")]
+public class PairCreatedEventBase : IEventDTO
+{
+    [Parameter("address", "token0", 1, true)]
+    public virtual string Token0 { get; set; }
+
+    [Parameter("address", "token1", 2, true)]
+    public virtual string Token1 { get; set; }
+
+    [Parameter("address", "pair", 3, false)]
+    public virtual string Pair { get; set; }
 }

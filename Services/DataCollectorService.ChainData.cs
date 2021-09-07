@@ -2,13 +2,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using log4net;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+using Serilog.Exceptions;
 
 namespace AnalyzerCore.Services
 {
@@ -19,7 +21,7 @@ namespace AnalyzerCore.Services
             private readonly List<string> _addressesToAnalyze;
             private readonly string _chainName;
             private readonly Task<HexBigInteger> _currentBlock;
-            private readonly ILog _log;
+            private readonly Logger _log;
             private readonly int _maxParallelism;
             public readonly Dictionary<string, Address> Addresses;
             public readonly BlockingCollection<EnTransaction> Transactions;
@@ -31,7 +33,17 @@ namespace AnalyzerCore.Services
                 Web3 = web3;
                 if (chainName != null) _chainName = chainName;
                 _maxParallelism = maxParallelism;
-                _log = LogManager.GetLogger($"{MethodBase.GetCurrentMethod()?.DeclaringType}: {this._chainName}");
+                _log = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                    .Enrich.FromLogContext()
+                    .Enrich.WithThreadId()
+                    .Enrich.WithExceptionDetails()
+                    .WriteTo.Console(
+                        restrictedToMinimumLevel: LogEventLevel.Information,
+                        outputTemplate: $"{{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}} [{{Level:u3}}] [DataCollector:{_chainName}] " +
+                                        "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                    .CreateLogger();
                 Transactions = new BlockingCollection<EnTransaction>();
                 Addresses = new Dictionary<string, Address>();
                 _addressesToAnalyze = addresses;
@@ -55,8 +67,17 @@ namespace AnalyzerCore.Services
                         blockParameter = new BlockParameter((ulong) b);
                         using var block =
                             Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
-                        block.Wait(cancellationToken);
-                        _log.Info(
+                        try
+                        {
+                            block.Wait(cancellationToken);
+                        }
+                        catch (Exception)
+                        {
+                            // Skip reading that block
+                            _log.Error($"Cannot retrieve block: {blockParameter}");
+                            return;
+                        }
+                        _log.Information(
                             $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
                         blockNum++;
                         var txCounter = 0;
