@@ -80,7 +80,7 @@ namespace AnalyzerCore.Services
             throw new NotImplementedException();
         }
 
-        public void OnNext(DataCollectorService.ChainData chainData)
+        public async void OnNext(DataCollectorService.ChainData chainData)
         {
             try
             {
@@ -165,7 +165,7 @@ namespace AnalyzerCore.Services
             }
 
             _log.Information("Analysis complete");
-            NotifyMissingTokens();
+            await NotifyMissingTokens();
         }
 
         private async Task<List<string>> AnalyzeSyncEvent(ContractHandler contractHandler)
@@ -265,7 +265,7 @@ namespace AnalyzerCore.Services
             }
         }
 
-        private void NotifyMissingTokens()
+        private async Task NotifyMissingTokens()
         {
             _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
             if (_missingTokens.Count <= 0)
@@ -294,6 +294,7 @@ namespace AnalyzerCore.Services
 
                 _telegramNotifier.SendMessage(msg);
                 _tokenNotified.Add(t.TokenAddress);
+                await Task.Delay(TimeSpan.FromSeconds(2));
             }
         }
 
