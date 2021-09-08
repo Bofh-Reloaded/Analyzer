@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Security.Cryptography;
 using Newtonsoft.Json;
 
 namespace AnalyzerCore.Models
@@ -50,6 +51,16 @@ namespace AnalyzerCore.Models
 
         [JsonProperty("ServicesConfig")] public ServicesConfig ServicesConfig { get; set; }
     }
+    
+    public class Ftm
+    {
+        [JsonProperty("RpcEndpoint")] public string RpcEndpoint { get; set; }
+        [JsonProperty("Enemies")] public List<string> Enemies { get; set; }
+
+        [JsonProperty("Address")] public string Address { get; set; }
+
+        [JsonProperty("ServicesConfig")] public ServicesConfig ServicesConfig { get; set; }
+    }
 
     public class AnalyzerConfig
     {
@@ -58,6 +69,8 @@ namespace AnalyzerCore.Models
         [JsonProperty("Bsc")] public Bsc Bsc { get; set; }
 
         [JsonProperty("Ply")] public Ply Ply { get; set; }
+        
+        [JsonProperty("Ftm")] public Ftm Ftm { get; set; }
     }
 
     public class Root

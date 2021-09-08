@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
@@ -180,7 +179,7 @@ namespace AnalyzerCore
                                     chainName: "HecoChain",
                                     telegramNotifier: new TelegramNotifier(
                                         "-516536036",
-                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
+                                        "1970460018:AAHp9Kfs2RTAYhV_DE45RF6FgRnDYG1lEeg"),
                                     chainDataHandler: hecoDataHandler,
                                     addressesToCompare: analyzerConfig.Heco.Enemies,
                                     "heco_tokenlists.data",
@@ -197,6 +196,54 @@ namespace AnalyzerCore
                                     analyzerConfig.Heco.ServicesConfig.MaxParallelism,
                                     hecoDataHandler,
                                     hecoAllAddresses
+                                ));
+                        }
+                        
+                        // Ftm
+                        var ftmAllAddresses = analyzerConfig.Ftm.Enemies;
+                        ftmAllAddresses.Add(analyzerConfig.Ftm.Address);
+                        var ftmDataHandler =
+                            new DataCollectorService.ChainDataHandler();
+                        if (analyzerConfig.Ftm.ServicesConfig.AnalyzerService)
+                        {
+                            services.AddScoped<IHostedService>(
+                                _ => new AnalyzerService(
+                                    "FantomChain",
+                                    analyzerConfig.Ftm.Enemies,
+                                    new TelegramNotifier(
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
+                                    5,
+                                    analyzerConfig.Ftm.Address,
+                                    ftmDataHandler
+                                )
+                            );
+                        }
+
+                        if (analyzerConfig.Ftm.ServicesConfig.TokenAnalyzer)
+                        {
+                            services.AddScoped<IHostedService>(
+                                _ => new TokenObserverService(
+                                    chainName: "FantomChain",
+                                    telegramNotifier: new TelegramNotifier(
+                                        "-516536036",
+                                        "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
+                                    chainDataHandler: ftmDataHandler,
+                                    addressesToCompare: analyzerConfig.Ftm.Enemies,
+                                    "fantom_tokenlists.data",
+                                    "https://ftmscan.com/")
+                            );
+                        }
+
+                        if (analyzerConfig.Ftm.ServicesConfig.DataCollector)
+                        {
+                            services.AddScoped<IHostedService>(
+                                _ => new DataCollectorService(
+                                    "FtmChain",
+                                    analyzerConfig.Ftm.RpcEndpoint,
+                                    analyzerConfig.Ftm.ServicesConfig.MaxParallelism,
+                                    ftmDataHandler,
+                                    ftmAllAddresses
                                 ));
                         }
                     }
