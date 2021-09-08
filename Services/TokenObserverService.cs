@@ -294,7 +294,7 @@ namespace AnalyzerCore.Services
 
                 _telegramNotifier.SendMessage(msg);
                 _tokenNotified.Add(t.TokenAddress);
-                await Task.Delay(TimeSpan.FromSeconds(2));
+                await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
 
