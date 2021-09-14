@@ -49,7 +49,7 @@ namespace AnalyzerCore.Services
         private static readonly TelegramBotClient Bot =
             new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
 
-        private static readonly string TelegramChatId = "-560874043";
+        private static readonly string TelegramChatId = "-502311043";
         private static readonly string TokenFileName = "bsc_tokenlists.data";
         private readonly string _chainName;
 
@@ -104,7 +104,7 @@ namespace AnalyzerCore.Services
                             tokenList.blacklisted.Contains(token2.ToLower())) token2Flag = true;
                         if (token1Flag && token2Flag) return;
                         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-                        var web3 = new Web3("http://162.55.98.218:8545");
+                        var web3 = new Web3("http://136.243.15.134:8545");
                         var token1ContractHandler = web3.Eth.GetContractHandler(token1);
                         var token2ContractHandler = web3.Eth.GetContractHandler(token2);
                         var poolContractHandler = web3.Eth.GetContractHandler(pool);

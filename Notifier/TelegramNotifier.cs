@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using AnalyzerCore.Services;
 using Serilog;
 using Serilog.Context;
 using Serilog.Events;
@@ -63,6 +65,24 @@ namespace AnalyzerCore.Notifier
             foreach (var a in message.Addresses)
             {
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
+                switch (a.Address)
+                {
+                    case "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178":
+                        m.Add($"<b>[token-king]</b>");
+                        break;
+                    case "0xaa7dcd270dd6734db602c3ea2e9749f74486619d":
+                        m.Add($"<b>[cp-king]</b>");
+                        break;
+                    case "0x6eb0569afb79ec893c8212cbf4dbad74eea666aa":
+                        m.Add($"<b>[cp-king-2]</b>");
+                        break;
+                }
+                var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
+                if (totalTxInMaxBlockRange.First().TotalTransactionsPerBlockRange == 0)
+                {
+                    m.Add("  No Activity from this address");
+                    continue;
+                }
                 foreach (var s in a.BlockRanges)
                     try
                     {
@@ -85,6 +105,7 @@ namespace AnalyzerCore.Notifier
                         }
                         else
                         {
+                            if (s.TotalTransactionsPerBlockRange == 0) continue;
                             m.Add(
                                 $" B: {s.BlockRange} T: {s.TotalTransactionsPerBlockRange} S: {s.SuccededTranstactionsPerBlockRange} WR: {s.SuccessRate}");
                         }
