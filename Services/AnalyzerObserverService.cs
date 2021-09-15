@@ -126,7 +126,7 @@ namespace AnalyzerCore.Services
                         BlockRange = numberOfBlocks,
                         SuccededTranstactionsPerBlockRange = succededTrxs.Count,
                         TotalTransactionsPerBlockRange = trxToAnalyze.Count,
-                        SuccessRate = succededTrxs.Count > 0 ? $"{100 * succededTrxs.Count / trxToAnalyze.Count}%" : "0"
+                        SuccessRate = succededTrxs.Count > 0 ? $"{(100 * succededTrxs.Count / trxToAnalyze.Count).ToString()}%" : "0"
                     };
                     if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
                     {

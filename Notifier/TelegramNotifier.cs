@@ -75,6 +75,9 @@ namespace AnalyzerCore.Notifier
                     case "0x6eb0569afb79ec893c8212cbf4dbad74eea666aa":
                         m.Add($"<b>[cp-king-2]</b>");
                         break;
+                    case "0xf188b2a4cec428a479ab87e61d2e3bbf17f7c32a":
+                        m.Add("[new-competitor]");
+                        break;
                 }
 
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
