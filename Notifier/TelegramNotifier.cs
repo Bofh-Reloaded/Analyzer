@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using AnalyzerCore.Services;
 using Serilog;
 using Serilog.Context;
 using Serilog.Events;
@@ -111,7 +110,7 @@ namespace AnalyzerCore.Notifier
                         {
                             if (s.TotalTransactionsPerBlockRange == 0) continue;
                             m.Add(
-                                $" B: {s.BlockRange} T: {s.TotalTransactionsPerBlockRange} S: {s.SuccededTranstactionsPerBlockRange} WR: {s.SuccessRate}");
+                                $" B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}");
                         }
                     }
                     catch (DivideByZeroException e)
@@ -121,7 +120,7 @@ namespace AnalyzerCore.Notifier
                     }
             }
 
-            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx}, Average TPS: {message.Tps}\U0001F4CA");
+            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx.ToString()}, Average TPS: {message.Tps}\U0001F4CA");
             var _ = await _bot.SendTextMessageAsync(
                 _chatId,
                 Join(Environment.NewLine, m.ToArray()),
