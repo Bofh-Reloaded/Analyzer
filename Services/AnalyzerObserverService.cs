@@ -142,6 +142,8 @@ namespace AnalyzerCore.Services
                         blockRangeStats.ContP = trxToAnalyze.Where(t =>
                                 t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
                             .ToList();
+                        blockRangeStats.Unknown = trxToAnalyze.Where(t =>
+                            t.Transaction.Input.StartsWith($"0x{OpCodes.Unknown}")).ToList();
                         blockRangeStats.T0TrxSucceded =
                             succededTrxs.Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.T0}"))
                                 .ToList();
@@ -153,6 +155,9 @@ namespace AnalyzerCore.Services
                                 .ToList();
                         blockRangeStats.ContPSucceded = succededTrxs
                             .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Cont}"))
+                            .ToList();
+                        blockRangeStats.UnknownSucceded = succededTrxs
+                            .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Unknown}"))
                             .ToList();
                     }
 

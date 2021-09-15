@@ -42,7 +42,6 @@ namespace AnalyzerCore.Notifier
 
         public async void SendMessage(string text)
         {
-
             try
             {
                 _log.Debug(text);
@@ -61,7 +60,7 @@ namespace AnalyzerCore.Notifier
 
         public async void SendStatsRecap(Message message)
         {
-            var m = new List<string> {message.Timestamp};
+            var m = new List<string> { message.Timestamp };
             foreach (var a in message.Addresses)
             {
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
@@ -77,12 +76,14 @@ namespace AnalyzerCore.Notifier
                         m.Add($"<b>[cp-king-2]</b>");
                         break;
                 }
+
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
                 if (totalTxInMaxBlockRange.First().TotalTransactionsPerBlockRange == 0)
                 {
                     m.Add("  No Activity from this address");
                     continue;
                 }
+
                 foreach (var s in a.BlockRanges)
                     try
                     {
@@ -90,18 +91,18 @@ namespace AnalyzerCore.Notifier
                         {
                             m.Add(
                                 $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
-                            if (s.T0TrxSucceded.Count > 0)
-                                m.Add(
-                                    $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {100 * s.T0TrxSucceded.Count / s.T0Trx.Count}%");
-                            if (s.T1TrxSucceded.Count > 0)
-                                m.Add(
-                                    $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {100 * s.T1TrxSucceded.Count / s.T1Trx.Count}%");
-                            if (s.T2TrxSucceded.Count > 0)
-                                m.Add(
-                                    $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {100 * s.T2TrxSucceded.Count / s.T2Trx.Count}%");
-                            if (s.ContPSucceded.Count > 0)
-                                m.Add(
-                                    $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {100 * s.ContPSucceded.Count / s.ContP.Count}%");
+                            var w = s.T0TrxSucceded.Count > 0 ? 100 * s.T0TrxSucceded.Count / s.T0Trx.Count : 0;
+                            m.Add(
+                                $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            w = s.T1TrxSucceded.Count > 0 ? 100 * s.T1TrxSucceded.Count / s.T1Trx.Count : 0;
+                            m.Add(
+                                $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            w = s.T2TrxSucceded.Count > 0 ? 100 * s.T2TrxSucceded.Count / s.T2Trx.Count : 0;
+                            m.Add(
+                                $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            w = s.ContPSucceded.Count > 0 ? 100 * s.ContPSucceded.Count / s.ContP.Count : 0;
+                            m.Add(
+                                $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {w.ToString()}%");
                         }
                         else
                         {

@@ -32,6 +32,8 @@ namespace AnalyzerCore.Models
         public List<DataCollectorService.ChainData.EnTransaction> T1TrxSucceded { get; internal set; }
         public List<DataCollectorService.ChainData.EnTransaction> T2TrxSucceded { get; internal set; }
         public List<DataCollectorService.ChainData.EnTransaction> ContPSucceded { get; internal set; }
+        public List<DataCollectorService.ChainData.EnTransaction> Unknown { get; set; }
+        public List<DataCollectorService.ChainData.EnTransaction> UnknownSucceded { get; set; }
     }
 
     public class AddressStats
