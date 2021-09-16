@@ -75,7 +75,7 @@ namespace AnalyzerCore.Notifier
                         m.Add($"<b>[cp-king-2]</b>");
                         break;
                     case "0xf188b2a4cec428a479ab87e61d2e3bbf17f7c32a":
-                        m.Add("[new-competitor]");
+                        m.Add("<b>[new-competitor]</b>");
                         break;
                 }
 
