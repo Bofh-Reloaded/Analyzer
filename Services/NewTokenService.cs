@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using AnalyzerCore.DbLayer;
 using AnalyzerCore.Models;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts;
@@ -43,6 +44,7 @@ namespace AnalyzerCore.Services
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
+            _db = new TokenContext();
             _log.Information("Starting Service");
         }
         
@@ -52,6 +54,7 @@ namespace AnalyzerCore.Services
         private static readonly string TelegramChatId = "-502311043";
         private static readonly string TokenFileName = "bsc_tokenlists.data";
         private readonly string _chainName;
+        private readonly TokenContext _db;
 
         private static string GetLinkFromElement(string element, string type = "token")
         {

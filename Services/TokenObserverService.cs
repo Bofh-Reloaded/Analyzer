@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using AnalyzerCore.DbLayer;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using Serilog;
@@ -41,7 +42,8 @@ namespace AnalyzerCore.Services
         private ConcurrentDictionary<string, Token> _missingTokens = null!;
         private TokenListConfig _tokenList = null!;
         private readonly List<string> _tokenNotified = new List<string>();
-        
+        private readonly TokenContext _db;
+
 
         public TokenObserverService(
             string chainName,
@@ -69,6 +71,7 @@ namespace AnalyzerCore.Services
                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
+            _db = new TokenContext();
         }
 
         public void OnCompleted()
@@ -206,98 +209,91 @@ namespace AnalyzerCore.Services
         {
             try
             {
-                // Check if the token is already in the list
-                if (_missingTokens.ContainsKey(token))
+                using (var db = new TokenContext())
                 {
-                    // Token exists, check if the supply is changed
-                    if (tokenTotalSupply < _missingTokens[token].TokenTotalSupply)
+                    if (db.Tokens.Select(t => t.TokenAddress == token) != null)
                     {
-                        _log.Information(
-                            $"Token: {token} changed supply from {_missingTokens[token].TokenTotalSupply.ToString()} to {tokenTotalSupply.ToString()}");
-                        _missingTokens[token].IsDeflationary = true;
-                        _missingTokens[token].TxCount++;
+                        if (db.Tokens.Select(e => e.TransactionHashes).Where(c => c.Contains(txHash)))
+                        // Update token details if we haven't seen that trx yet
+                        if (!_missingTokens[token].TransactionHashes.Contains(txHash))
+                        {
+                            _missingTokens[token].TransactionHashes.Add(txHash);
+                            _missingTokens[token].TokenTotalSupply = tokenTotalSupply;
+                            _missingTokens[token].TxCount++;
+                            _missingTokens[token].From = t.Transaction.From;
+                            _missingTokens[token].To = t.Transaction.To;
+                            if (!_missingTokens[token]
+                                .ExchangesList.Contains(exchangeAddress.ToLower()))
+                                _missingTokens[token]
+                                    .ExchangesList.Add(exchangeAddress.ToLower());
+                            if (!_missingTokens[token]
+                                .PoolsList.Contains(poolAddress.ToLower()))
+                                _missingTokens[token]
+                                    .PoolsList.Add(poolAddress.ToLower());
+                        }
+                    }
+                    else
+                    {
+                        // Create the object inside the dictionary since it's the first time that we see it
+                        _missingTokens[token] = new Token
+                        {
+                            ExchangesList = new List<string>(),
+                            TokenAddress = token,
+                            TransactionHashes = new List<string>(),
+                            TokenSymbol = tokenSymbol,
+                            TokenTotalSupply = tokenTotalSupply,
+                            IsDeflationary = false,
+                            TxCount = 1,
+                            From = t.Transaction.From,
+                            To = t.Transaction.To,
+                            PoolsList = new List<string>()
+                        };
+                        _missingTokens[token].ExchangesList.Add(exchangeAddress.ToLower());
+                        _missingTokens[token].PoolsList.Add(poolAddress.ToLower());
                     }
 
-                    // Update token details if we haven't seen that trx yet
-                    if (!_missingTokens[token].TransactionHashes.Contains(txHash))
-                    {
-                        _missingTokens[token].TransactionHashes.Add(txHash);
-                        _missingTokens[token].TokenTotalSupply = tokenTotalSupply;
-                        _missingTokens[token].TxCount++;
-                        _missingTokens[token].From = t.Transaction.From;
-                        _missingTokens[token].To = t.Transaction.To;
-                        if (!_missingTokens[token]
-                            .ExchangesList.Contains(exchangeAddress.ToLower()))
-                            _missingTokens[token]
-                                .ExchangesList.Add(exchangeAddress.ToLower());
-                        if (!_missingTokens[token]
-                            .PoolsList.Contains(poolAddress.ToLower()))
-                            _missingTokens[token]
-                                .PoolsList.Add(poolAddress.ToLower());
-                    }
+                    _log.Information(
+                        $"Found missing Token: {token} with TxHash: {txHash} with {_missingTokens[token].ExchangesList.Count} pools, total txCount: {_missingTokens[token].TxCount.ToString()}");
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Create the object inside the dictionary since it's the first time that we see it
-                    _missingTokens[token] = new Token
-                    {
-                        ExchangesList = new List<string>(),
-                        TokenAddress = token,
-                        TransactionHashes = new List<string>(),
-                        TokenSymbol = tokenSymbol,
-                        TokenTotalSupply = tokenTotalSupply,
-                        IsDeflationary = false,
-                        TxCount = 1,
-                        From = t.Transaction.From,
-                        To = t.Transaction.To,
-                        PoolsList = new List<string>()
-                    };
-                    _missingTokens[token].ExchangesList.Add(exchangeAddress.ToLower());
-                    _missingTokens[token].PoolsList.Add(poolAddress.ToLower());
+                    _log.Error(ex.Message);
+                    throw;
+                }
+            }
+
+            private async Task NotifyMissingTokens()
+            {
+                _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
+                if (_missingTokens.Count <= 0)
+                {
+                    _log.Information("No Missing token found this time");
+                    _telegramNotifier.SendMessage("No Missing Tokens inside the analyzed transactions");
+                    return;
                 }
 
-                _log.Information(
-                    $"Found missing Token: {token} with TxHash: {txHash} with {_missingTokens[token].ExchangesList.Count} pools, total txCount: {_missingTokens[token].TxCount.ToString()}");
-            }
-            catch (Exception ex)
-            {
-                _log.Error(ex.Message);
-                throw;
-            }
-        }
+                foreach (var t in _missingTokens.Values.ToList().OrderBy(o => o.TxCount).Reverse())
+                {
+                    // Skip Already Notified Tokens
+                    if (_tokenNotified.Contains(t.TokenAddress)) continue;
+                    const string star = "\U00002B50";
+                    var msg = string.Join(
+                        Environment.NewLine,
+                        $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
+                        $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
+                        $"  totalTxCount: {t.TxCount.ToString()}",
+                        $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
+                        $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                        $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                        $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                        $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
+                    );
 
-        private async Task NotifyMissingTokens()
-        {
-            _log.Debug($"MissingTokens: {_missingTokens.Count.ToString()}");
-            if (_missingTokens.Count <= 0)
-            {
-                _log.Information("No Missing token found this time");
-                _telegramNotifier.SendMessage("No Missing Tokens inside the analyzed transactions");
-                return;
+                    _telegramNotifier.SendMessage(msg);
+                    _tokenNotified.Add(t.TokenAddress);
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+                }
             }
-
-            foreach (var t in _missingTokens.Values.ToList().OrderBy(o => o.TxCount).Reverse())
-            {
-                // Skip Already Notified Tokens
-                if (_tokenNotified.Contains(t.TokenAddress)) continue;
-                const string star = "\U00002B50";
-                var msg = string.Join(
-                    Environment.NewLine,
-                    $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
-                    $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
-                    $"  totalTxCount: {t.TxCount.ToString()}",
-                    $"  lastTxSeen: <a href='{_baseUri}tx/{t.GetLatestTxHash()}'>{t.GetLatestTxHash()[..10]}...{t.GetLatestTxHash()[^10..]}</a>",
-                    $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
-                    $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                    $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, t.PoolsList.Select(p => $"    <a href='{_baseUri}address/{p.ToString()}'>{p.ToString()[..10]}...{p.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                    $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.ExchangesList.Select(e => $"    <a href='{_baseUri}address/{e.ToString()}'>{e.ToString()[..10]}...{e.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]"
-                );
-
-                _telegramNotifier.SendMessage(msg);
-                _tokenNotified.Add(t.TokenAddress);
-                await Task.Delay(TimeSpan.FromSeconds(5));
-            }
-        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
