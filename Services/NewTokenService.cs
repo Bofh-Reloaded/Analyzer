@@ -44,7 +44,7 @@ namespace AnalyzerCore.Services
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
-            _db = new TokenContext();
+            _db = new TokenDbContext();
             _log.Information("Starting Service");
         }
         
@@ -54,7 +54,7 @@ namespace AnalyzerCore.Services
         private static readonly string TelegramChatId = "-502311043";
         private static readonly string TokenFileName = "bsc_tokenlists.data";
         private readonly string _chainName;
-        private readonly TokenContext _db;
+        private readonly TokenDbContext _db;
 
         private static string GetLinkFromElement(string element, string type = "token")
         {

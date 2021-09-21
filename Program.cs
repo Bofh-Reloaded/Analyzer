@@ -18,7 +18,7 @@ namespace AnalyzerCore
         {
             var log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
                 .Enrich.FromLogContext()
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()

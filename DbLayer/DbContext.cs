@@ -1,25 +1,26 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using DbContext = Microsoft.EntityFrameworkCore.DbContext;
+
 
 namespace AnalyzerCore.DbLayer
 {
-    public class TokenContext : DbContext
+    public class TokenDbContext : DbContext
     {
-        public DbSet<Models.TokenDb> Tokens { get; set; }
-
-        public string DbPath { get; private set; }
-
-        public TokenContext()
+        public TokenDbContext()
         {
-            const Environment.SpecialFolder folder = Environment.SpecialFolder.LocalApplicationData;
-            var path = Environment.GetFolderPath(folder);
-            DbPath = $"{path}{System.IO.Path.DirectorySeparatorChar.ToString()}missingTokens.db";
-        }
 
-        // The following configures EF to create a Sqlite database file in the
-        // special "local" folder for your platform.
+        }
+        
         protected override void OnConfiguring(DbContextOptionsBuilder options)
-            => options.UseSqlite($"Data Source={DbPath}");
+            => options.UseSqlite($"Data Source=.\\local.db");
+
+        private string DbPath
+        { get; set; }
+
+
+        public DbSet<Models.TokenEntity> Tokens { get; set; }
+        public DbSet<Models.Pool> Pools { get; set; }
+        public DbSet<Models.Exchange> Exchanges { get; set; }
+        public DbSet<Models.TransactionHash> TransactionHashes { get; set; }
     }
 }

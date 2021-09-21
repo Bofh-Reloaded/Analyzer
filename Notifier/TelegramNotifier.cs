@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Serilog;
 using Serilog.Context;
 using Serilog.Events;
@@ -55,6 +56,40 @@ namespace AnalyzerCore.Notifier
             {
                 _log.Error(r.Message);
             }
+        }
+
+        public async Task DeleteMessageAsync(int messageId)
+        {
+            try
+            {
+                _log.Debug($"Deleting messageId: {messageId} inside chat: {_chatId}");
+                await _bot.DeleteMessageAsync(_chatId, messageId);
+            }
+            catch (Exception e)
+            {
+                _log.Error(e.Message);
+            }
+        }
+        
+        public async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
+        {
+            try
+            {
+                _log.Debug(text);
+                var resp = await _bot.SendTextMessageAsync(
+                    _chatId,
+                    text,
+                    ParseMode.Html,
+                    disableWebPagePreview: true
+                );
+                return resp;
+            }
+            catch (Exception r)
+            {
+                _log.Error(r.Message);
+                return null;
+            }
+
         }
 
         public async void SendStatsRecap(Message message)

@@ -9,8 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
-    <PackageReference Include="EntityFramework" Version="6.4.4" />
     <PackageReference Include="JSON.net" Version="1.0.33" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="5.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -47,21 +47,35 @@
     <PackageReference Include="Serilog.Exceptions" Version="7.0.0" />
     <PackageReference Include="Serilog.Expressions" Version="3.2.1-dev-00071" />
     <PackageReference Include="Serilog.Sinks.Console" Version="4.0.1-dev-00876" />
+    <PackageReference Include="SQLite.CodeFirst" Version="1.7.0.34" />
     <PackageReference Include="Telegram.Bot" Version="15.7.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="DbLayer\Database" />
     <Folder Include="Libs\" />
+    <Folder Include="Migrations" />
     <Folder Include="Notifier\" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="appSettings.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="tokens.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="local.db" />
+    <Content Include="local.db">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Remove="appSettings.json" />
+    <Content Include="appSettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Remove="bsc_tokenlists.data" />
+    <Content Include="bsc_tokenlists.data">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

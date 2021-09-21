@@ -18,7 +18,9 @@ namespace AnalyzerCore.Services
     public sealed class AnalyzerService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
         // Define the delay between one cycle and another
-        private const int TaskDelayMs = 360000;
+        private const int TASK_TASK_DELAY_MS = 360000;
+
+        private const string TASK_VERSION = "0.9-db-persistance";
 
         // Array of block to analyze
         private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() { 25, 100, 500 };
@@ -177,8 +179,8 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information($"Starting AnalyzerService for chain: {_chainName}");
-            _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}");
+            _log.Information($"Starting AnalyzerService for chain: {_chainName}, version: {TASK_VERSION}");
+            _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}, version: {TASK_VERSION}");
             stoppingToken.Register(() =>
                 {
                     Unsubscribe();
@@ -189,7 +191,7 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 Subscribe(_chainDataHandler);
-                await Task.Delay(TaskDelayMs, stoppingToken);
+                await Task.Delay(TASK_TASK_DELAY_MS, stoppingToken);
             }
         }
 
