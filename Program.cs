@@ -74,10 +74,10 @@ namespace AnalyzerCore
                                 telegramNotifier: new TelegramNotifier(
                                     "-568322563",
                                     "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
-                                chainDataHandler: plyDataHandler,
                                 addressesToCompare: analyzerConfig.Ply.Enemies,
                                 "polygon_tokenlists.data",
-                                "https://polygonscan.com/")
+                                "https://polygonscan.com/",
+                                analyzerConfig.Ply.RpcEndpoint)
                         );
                     }
 
@@ -121,12 +121,12 @@ namespace AnalyzerCore
                             _ => new TokenObserverService(
                                 chainName: "BinanceSmartChain",
                                 telegramNotifier: new TelegramNotifier(
-                                    "-556783420",
+                                    "-466406748",
                                     "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
-                                chainDataHandler: bscDataHandler,
                                 addressesToCompare: analyzerConfig.Bsc.Enemies,
                                 "bsc_tokenlists.data",
-                                "https://www.bscscan.com/")
+                                "https://www.bscscan.com/",
+                                analyzerConfig.Bsc.RpcEndpoint)
                         );
                     }
 
@@ -177,12 +177,12 @@ namespace AnalyzerCore
                             _ => new TokenObserverService(
                                 chainName: "HecoChain",
                                 telegramNotifier: new TelegramNotifier(
-                                    "-516536036",
-                                    "1970460018:AAHp9Kfs2RTAYhV_DE45RF6FgRnDYG1lEeg"),
-                                chainDataHandler: hecoDataHandler,
+                                    "-559396494",
+                                    "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
                                 addressesToCompare: analyzerConfig.Heco.Enemies,
                                 "heco_tokenlists.data",
-                                "https://hecoinfo.com/")
+                                "https://hecoinfo.com/",
+                                analyzerConfig.Heco.RpcEndpoint)
                         );
                     }
 
@@ -227,10 +227,10 @@ namespace AnalyzerCore
                                 telegramNotifier: new TelegramNotifier(
                                     "-516536036",
                                     "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
-                                chainDataHandler: ftmDataHandler,
                                 addressesToCompare: analyzerConfig.Ftm.Enemies,
                                 "fantom_tokenlists.data",
-                                "https://ftmscan.com/")
+                                "https://ftmscan.com/",
+                                analyzerConfig.Ftm.RpcEndpoint)
                         );
                     }
 

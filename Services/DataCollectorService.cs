@@ -16,9 +16,9 @@ namespace AnalyzerCore.Services
     public partial class DataCollectorService : BackgroundService
     {
         // Define the delay between one cycle and another
-        private const int TaskDelayMs = 360000;
+        private const int TASK_TASK_DELAY_MS = 360000;
 
-        private const int NumberOfBlocksToRetrieve = 500;
+        private const int TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE = 500;
 
         private readonly List<string> _addresses;
         private readonly ChainDataHandler _chainDataHandler;
@@ -28,7 +28,7 @@ namespace AnalyzerCore.Services
 
         private readonly int _maxParallelism;
 
-        public readonly Web3 Web3;
+        private readonly Web3 _web3;
 
         public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler,
             List<string> addresses)
@@ -52,7 +52,7 @@ namespace AnalyzerCore.Services
             _log.Information($"DataCollectorService Initialized for chain: {chainName}");
             try
             {
-                Web3 = new Web3(uri);
+                _web3 = new Web3(uri);
             }
             catch
             {
@@ -72,7 +72,7 @@ namespace AnalyzerCore.Services
                 ChainData chainData;
                 try
                 {
-                    chainData = new ChainData(Web3, _chainName, _maxParallelism, _addresses);
+                    chainData = new ChainData(_web3, _chainName, _maxParallelism, _addresses);
                     _log.Information($"Retrieved currentBlock: {chainData.CurrentBlock}");
                 }
                 catch (Exception)
@@ -84,8 +84,8 @@ namespace AnalyzerCore.Services
 
                 Debug.Assert(chainData != null, nameof(chainData) + " != null");
                 var currentBlock = chainData.CurrentBlock;
-                _log.Information($"Processing Blocks: {NumberOfBlocksToRetrieve.ToString()}");
-                var startBlock = new HexBigInteger(currentBlock.Value - NumberOfBlocksToRetrieve);
+                _log.Information($"Processing Blocks: {TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE.ToString()}");
+                var startBlock = new HexBigInteger(currentBlock.Value - TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE);
                 _log.Information($"From Block: {startBlock.Value.ToString()} To Block: {currentBlock.Value.ToString()}");
                 await Task.Run(() => 
                     chainData.GetBlocks(
@@ -93,7 +93,7 @@ namespace AnalyzerCore.Services
                     stoppingToken);
                 _log.Information($"Total Trx Retrieved: {chainData.Transactions.Count.ToString()}");
                 _chainDataHandler.DataChange(chainData);
-                await Task.Delay(TaskDelayMs, stoppingToken);
+                await Task.Delay(TASK_TASK_DELAY_MS, stoppingToken);
             }
         }
     }
