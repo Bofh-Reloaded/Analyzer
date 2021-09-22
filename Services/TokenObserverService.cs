@@ -23,6 +23,7 @@ namespace AnalyzerCore.Services
     public class TokenObserverService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
         private const string TASK_VERSION = "0.9-db-persistance";
+
         private const string TASK_SYNC_EVENT_ADDRESS =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
