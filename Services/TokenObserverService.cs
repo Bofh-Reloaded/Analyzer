@@ -174,12 +174,15 @@ namespace AnalyzerCore.Services
             TelegramNotifier telegramNotifier)
         {
             // Iterate all Notified Tokens
-            var notifiedTokens = context.Tokens.Where(o => o.Notified == true);
+            var notifiedTokens = context.Tokens
+                .Where(o => o.Notified == true && o.Deleted == false);
             foreach (var token in notifiedTokens)
             {
                 if (!knownToken.Contains(token.TokenAddress)) continue;
                 _log.Information($"Deleting messageId: {token.TelegramMsgId}...");
                 await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
+                token.Deleted = true;
+                await context.SaveChangesAsync();
             }
         }
 

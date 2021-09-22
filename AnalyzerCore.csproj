@@ -66,9 +66,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="local.db" />
-    <Content Include="local.db">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <None Remove="appSettings.json" />
     <Content Include="appSettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

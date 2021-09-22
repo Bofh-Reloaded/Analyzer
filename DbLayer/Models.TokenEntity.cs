@@ -19,6 +19,7 @@ namespace AnalyzerCore.DbLayer
             public string To { get; set; }
             public int TelegramMsgId { get; set; }
             public bool Notified { get; set; }
+            public bool Deleted { get; set; }
             public ICollection<TransactionHash> TransactionHashes { get; } = new List<TransactionHash>();
             public ICollection<Exchange> Exchanges { get; } = new List<Exchange>();
             public ICollection<Pool> Pools { get; } = new List<Pool>();
