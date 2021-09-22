@@ -121,7 +121,7 @@ namespace AnalyzerCore
                             _ => new TokenObserverService(
                                 chainName: "BinanceSmartChain",
                                 telegramNotifier: new TelegramNotifier(
-                                    "-556783420",
+                                    "-490703449",
                                     "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
                                 chainDataHandler: bscDataHandler,
                                 addressesToCompare: analyzerConfig.Bsc.Enemies,
