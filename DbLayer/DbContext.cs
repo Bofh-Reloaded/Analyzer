@@ -12,7 +12,7 @@ namespace AnalyzerCore.DbLayer
         }
         
         protected override void OnConfiguring(DbContextOptionsBuilder options)
-            => options.UseSqlite($"Data Source=.\\local.db");
+            => options.UseSqlite($"Data Source=local.db");
 
         private string DbPath
         { get; set; }
