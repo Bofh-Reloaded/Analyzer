@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Models;
@@ -31,6 +32,7 @@ namespace AnalyzerCore.Services
         private readonly int _maxParallelism;
 
         private readonly Web3 _web3;
+        private HexBigInteger _oldBlock = new HexBigInteger(new BigInteger(0));
 
         public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler)
         {
@@ -86,6 +88,15 @@ namespace AnalyzerCore.Services
 
                 Debug.Assert(chainData != null, nameof(chainData) + " != null");
                 var currentBlock = chainData.CurrentBlock;
+                if (_oldBlock.Value != 0)
+                {
+                    if (_oldBlock.Value == currentBlock.Value)
+                    {
+                        _log.Error("We are retrieving the same block, change RPC. Stopping Service.");
+                        await StopAsync(stoppingToken);
+                    }
+                }
+                _oldBlock = currentBlock;
                 _log.Information($"Processing Blocks: {TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE.ToString()}");
                 var startBlock = new HexBigInteger(currentBlock.Value - TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE);
                 _log.Information($"From Block: {startBlock.Value.ToString()} To Block: {currentBlock.Value.ToString()}");

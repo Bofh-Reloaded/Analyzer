@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using AnalyzerCore.Notifier;
 using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
+using Nethereum.JsonRpc.Client.Streaming;
 using Nethereum.JsonRpc.WebSocketStreamingClient;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.RPC.Reactive.Eth.Subscriptions;
@@ -318,7 +320,7 @@ namespace AnalyzerCore.Services
                         : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
                     lastBlockNotification = DateTime.Now;
                     var utcTimestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value);
-                    Console.WriteLine(
+                    _log.Warning(
                         $"New Block. Number: {block.Number.Value}, Timestamp UTC: {JsonConvert.SerializeObject(utcTimestamp)}, Seconds since last block received: {secondsSinceLastBlock} ");
                     await ProcessNewBlock(block, stoppingToken);
                 });
@@ -330,7 +332,7 @@ namespace AnalyzerCore.Services
                 subscription.GetUnsubscribeResponseAsObservable().Subscribe(response =>
                 {
                     subscribed = false;
-                    Console.WriteLine("Block Header unsubscribe result: " + response);
+                    _log.Warning("Block Header unsubscribe result: " + response);
                 });
 
                 // open the websocket connection
@@ -342,14 +344,20 @@ namespace AnalyzerCore.Services
                 // blocks will be delivered to our handler on another thread
                 await subscription.SubscribeAsync();
 
-                // run for a minute before unsubscribing
-                await Task.Delay(TimeSpan.FromSeconds(120), stoppingToken);
-
-                // unsubscribe
-                await subscription.UnsubscribeAsync();
-
-                //allow time to unsubscribe
-                while (subscribed) await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                while (subscription.SubscriptionState is SubscriptionState.Subscribed or SubscriptionState.Subscribing)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                    _log.Warning(subscription.SubscriptionState.ToString());
+                    secondsSinceLastBlock = (lastBlockNotification == null)
+                        ? 0
+                        : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
+                    _log.Warning($"Last block notification: {secondsSinceLastBlock} seconds ago");
+                    if (!(secondsSinceLastBlock > 20)) continue;
+                    _log.Error("Websocket streaming bugged, restarting...");
+                    await subscription.UnsubscribeAsync();
+                    //await StopAsync(new CancellationToken());
+                    //await StartAsync(new CancellationToken());
+                }
             }
         }
 
@@ -383,33 +391,53 @@ namespace AnalyzerCore.Services
 
             // Retrieve Transactions inside the block
             _log.Information("getting transactions inside block");
-            var policy = Policy
+            /*var policy = Policy
                 .Handle<Exception>()
-                .WaitAndRetry(new[]
+                .WaitAndRetryAsync(new[]
                 {
+                    TimeSpan.FromSeconds(1),
                     TimeSpan.FromSeconds(2),
-                    TimeSpan.FromSeconds(4),
-                    TimeSpan.FromSeconds(6)
+                    TimeSpan.FromSeconds(3)
                 });
             Task<BlockWithTransactions> blockTransactions = null;
-            policy.Execute(() =>
+            await policy.ExecuteAsync(async () =>
             {
                 blockTransactions =
                     _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(
                         new BlockParameter((ulong)block.Number.Value));
-                blockTransactions.Wait(cancellationToken);
-            });
+                try
+                {
+                    blockTransactions.Wait(cancellationToken);
+                }
+                catch (Exception)
+                {
+                    blockTransactions = null;
+                }
+            });*/
+            BlockWithTransactions blockTransactions = null;
+            try
+            {
+                blockTransactions = await
+                    _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(
+                        new BlockParameter((ulong)block.Number.Value));
+            }
+            catch (Exception e)
+            {
+                _log.Error(e.Message);
+                return;
+            }
+
             _log.Information("transactions retrieved");
 
             // Slow down...
             if (blockTransactions != null)
             {
                 _log.Information(
-                    $"Transaction inside block [{block.Number.Value}]: {blockTransactions.Result.Transactions.Length}");
+                    $"Transaction inside block [{block.Number.Value}]: {blockTransactions.Transactions.Length}");
 
                 // Select only transaction from the address that we need analyze
                 var transactionsToAnalyze = new List<Transaction>();
-                foreach (var tx in blockTransactions.Result.Transactions)
+                foreach (var tx in blockTransactions.Transactions)
                 {
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
@@ -444,16 +472,13 @@ namespace AnalyzerCore.Services
 
                                 _log.Debug($"[ ] Token: {token}");
                                 var tokenContractHandler = _web3.Eth.GetContractHandler(token);
-                                var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
-                                tokenSymbol.Wait(cancellationToken);
-                                var tokenTotalSupply =
-                                    tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                                tokenTotalSupply.Wait(cancellationToken);
+                                var tokenSymbol = await tokenContractHandler.QueryAsync<SymbolFunction, string>();
+                                var tokenTotalSupply = await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
                                 _log.Debug(
-                                    $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.TransactionHash} {poolFactory.Result}");
+                                    $"[  ] {tokenSymbol} {tokenTotalSupply.ToString()} {t.TransactionHash} {poolFactory.Result}");
                                 ProcessTokenAndPersistInDb(
                                     token,
-                                    tokenSymbol.Result,
+                                    tokenSymbol,
                                     t.TransactionHash,
                                     poolContractHandler.ContractAddress,
                                     poolFactory.Result,
@@ -473,8 +498,6 @@ namespace AnalyzerCore.Services
             _log.Information("Cleaning Tokens");
             // Clean up Telegram
             await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);
-
-            await Task.Delay(TASK_TASK_DELAY_MS, cancellationToken);
         }
     }
 }
