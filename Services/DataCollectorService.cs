@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AnalyzerCore.Models;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
 using Serilog;
@@ -30,11 +32,10 @@ namespace AnalyzerCore.Services
 
         private readonly Web3 _web3;
 
-        public DataCollectorService(string chainName, string uri, int maxParallelism, ChainDataHandler chainDataHandler,
-            List<string> addresses)
+        public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler)
         {
-            _chainName = chainName;
-            _maxParallelism = maxParallelism;
+            _chainName = config.ChainName;
+            _maxParallelism = config.ServicesConfig.MaxParallelism;
             _chainDataHandler = chainDataHandler;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -49,17 +50,18 @@ namespace AnalyzerCore.Services
             LogContext.PushProperty("SourceContext", $"{_chainName}");
             
             // Registering Web3 client endpoint
-            _log.Information($"DataCollectorService Initialized for chain: {chainName}");
+            _log.Information($"DataCollectorService Initialized for chain: {config.ChainName}");
             try
             {
-                _web3 = new Web3(uri);
+                _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort}");
             }
             catch
             {
-                _log.Error($"Cannot connect to RPC: {uri}.");
+                _log.Error($"Cannot connect to RPC: {config.RpcEndpoints.First()}.");
             }
 
-            _addresses = addresses;
+            _addresses = config.Enemies;
+            _addresses.Add(config.Address);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

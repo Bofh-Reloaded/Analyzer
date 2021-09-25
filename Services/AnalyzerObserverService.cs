@@ -20,7 +20,7 @@ namespace AnalyzerCore.Services
         // Define the delay between one cycle and another
         private const int TASK_TASK_DELAY_MS = 360000;
 
-        private const string TASK_VERSION = "0.9-db-persistance";
+        private const string TASK_VERSION = "0.9-db-persistance-websocket";
 
         // Array of block to analyze
         private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() { 25, 100, 500 };
@@ -43,17 +43,18 @@ namespace AnalyzerCore.Services
         private readonly TelegramNotifier _telegramNotifier;
         private IDisposable _cancellation;
 
-        public AnalyzerService(string chainName, List<string> addresses, TelegramNotifier telegramNotifier,
-            int blockDurationTime, string ourAddress, DataCollectorService.ChainDataHandler chainDataHandler)
+        public AnalyzerService(AnalyzerConfig config, DataCollectorService.ChainDataHandler chainDataHandler)
         {
-            if (blockDurationTime <= 0) throw new ArgumentOutOfRangeException(nameof(blockDurationTime));
+            if (config.ServicesConfig.AnalyzerService.BlockDurationTime <= 0)
+                throw new ArgumentOutOfRangeException(nameof(config.ServicesConfig.AnalyzerService.BlockDurationTime));
             // Filling instance variable
-            _chainName = chainName ?? throw new ArgumentNullException(nameof(chainName));
-            _addresses = addresses ?? throw new ArgumentNullException(nameof(addresses));
-            _telegramNotifier = telegramNotifier ?? throw new ArgumentNullException(nameof(telegramNotifier));
-            _blockDurationTime = blockDurationTime;
-            _ourAddress = ourAddress ?? throw new ArgumentNullException(nameof(ourAddress));
-            //_addresses.Add(ourAddress);
+            _chainName = config.ChainName;
+            _addresses = config.Enemies;
+            _addresses.Add(config.Address);
+            _telegramNotifier = new TelegramNotifier(config.ServicesConfig.AnalyzerService.ChatId,
+                config.ServicesConfig.AnalyzerService.BotToken);
+            _blockDurationTime = config.ServicesConfig.AnalyzerService.BlockDurationTime;
+            _ourAddress = config.Address;
             _chainDataHandler = chainDataHandler;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -66,8 +67,8 @@ namespace AnalyzerCore.Services
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
-            
-            _log.Information($"AnalyzerService Initialized for chain: {chainName}");
+
+            _log.Information($"AnalyzerService Initialized for chain: {config.ChainName}");
         }
 
         public void OnCompleted()
@@ -128,7 +129,9 @@ namespace AnalyzerCore.Services
                         BlockRange = numberOfBlocks,
                         SuccededTranstactionsPerBlockRange = succededTrxs.Count,
                         TotalTransactionsPerBlockRange = trxToAnalyze.Count,
-                        SuccessRate = succededTrxs.Count > 0 ? $"{(100 * succededTrxs.Count / trxToAnalyze.Count).ToString()}%" : "0"
+                        SuccessRate = succededTrxs.Count > 0
+                            ? $"{(100 * succededTrxs.Count / trxToAnalyze.Count).ToString()}%"
+                            : "0"
                     };
                     if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
                     {

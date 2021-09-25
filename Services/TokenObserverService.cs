@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using AnalyzerCore.Tools;
 using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
@@ -49,20 +48,19 @@ namespace AnalyzerCore.Services
         private IConfigurationRoot? _configuration;
 
         private TokenListConfig _tokenList = null!;
+        private readonly AnalyzerConfig _config;
 
 
-        public TokenObserverService(
-            string chainName,
-            TelegramNotifier telegramNotifier,
-            List<string> addressesToCompare,
-            string tokenFileName, string baseUri, string rpcEndpoint)
+        public TokenObserverService(AnalyzerConfig config)
         {
-            _chainName = chainName;
-            _telegramNotifier = telegramNotifier;
-            _tokenAddressToCompareWith = addressesToCompare;
-            _baseUri = baseUri;
-            _web3 = new Web3(rpcEndpoint);
-            _tokenFileName = tokenFileName;
+            _chainName = config.ChainName;
+            _telegramNotifier = new TelegramNotifier(config.ServicesConfig.TokenAnalyzer.ChatId,
+                config.ServicesConfig.TokenAnalyzer.BotToken);
+            _tokenAddressToCompareWith = config.Enemies;
+            _baseUri = config.ServicesConfig.TokenAnalyzer.BaseUri;
+            _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort.ToString()}");
+            _tokenFileName = config.ServicesConfig.TokenAnalyzer.TokenFileName;
+            _config = config;
 
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -136,7 +134,7 @@ namespace AnalyzerCore.Services
             }
         }
 
-        private void EvaluateToken(string token, string tokenSymbol, string txHash, string poolAddress,
+        private void ProcessTokenAndPersistInDb(string token, string tokenSymbol, string txHash, string poolAddress,
             string exchangeAddress, Transaction t)
         {
             try
@@ -260,6 +258,7 @@ namespace AnalyzerCore.Services
                     var msg = string.Join(
                         Environment.NewLine,
                         $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
+                        $"  token address: {t.TokenAddress}",
                         $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                         $"  totalTxCount: {t.TxCount.ToString()}",
                         $"  lastTxSeen: <a href='{_baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
@@ -295,7 +294,9 @@ namespace AnalyzerCore.Services
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                using var client = new StreamingWebSocketClient("ws://188.166.254.141:8546");
+                var uri = $"ws://{_config.RpcEndpoints.First()}:{_config.WssPort}";
+                _log.Information($"Using WebSocket on: {uri}");
+                using var client = new StreamingWebSocketClient(uri);
                 // create the subscription
                 // (it won't start receiving data until Subscribe is called)
                 var subscription = new EthNewBlockHeadersObservableSubscription(client);
@@ -342,7 +343,7 @@ namespace AnalyzerCore.Services
                 await subscription.SubscribeAsync();
 
                 // run for a minute before unsubscribing
-                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(120), stoppingToken);
 
                 // unsubscribe
                 await subscription.UnsubscribeAsync();
@@ -374,15 +375,6 @@ namespace AnalyzerCore.Services
             return _tokenList.whitelisted.Concat(_tokenList.blacklisted).ToList();
         }
 
-        private BlockWithTransactions GetTransactionFromBlock(Block block, CancellationToken cancellationToken)
-        {
-            using var blockTransactions =
-                _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(
-                    new BlockParameter((ulong)block.Number.Value));
-            blockTransactions.Wait(cancellationToken);
-            return blockTransactions.Result;
-        }
-
         private async Task ProcessNewBlock(Block block, CancellationToken cancellationToken)
         {
             _log.Information($"New Block Received: {block.Number.Value}");
@@ -390,6 +382,7 @@ namespace AnalyzerCore.Services
             List<string> completeTokenList = ReloadTokenList();
 
             // Retrieve Transactions inside the block
+            _log.Information("getting transactions inside block");
             var policy = Policy
                 .Handle<Exception>()
                 .WaitAndRetry(new[]
@@ -406,6 +399,7 @@ namespace AnalyzerCore.Services
                         new BlockParameter((ulong)block.Number.Value));
                 blockTransactions.Wait(cancellationToken);
             });
+            _log.Information("transactions retrieved");
 
             // Slow down...
             if (blockTransactions != null)
@@ -419,7 +413,8 @@ namespace AnalyzerCore.Services
                 {
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
-                    if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr)) transactionsToAnalyze.Add(tx);
+                    if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr))
+                        transactionsToAnalyze.Add(tx);
                     if (toAddr != null && _tokenAddressToCompareWith.Contains(toAddr)) transactionsToAnalyze.Add(tx);
                 }
 
@@ -456,7 +451,7 @@ namespace AnalyzerCore.Services
                                 tokenTotalSupply.Wait(cancellationToken);
                                 _log.Debug(
                                     $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.TransactionHash} {poolFactory.Result}");
-                                EvaluateToken(
+                                ProcessTokenAndPersistInDb(
                                     token,
                                     tokenSymbol.Result,
                                     t.TransactionHash,
