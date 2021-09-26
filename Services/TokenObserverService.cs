@@ -450,7 +450,15 @@ namespace AnalyzerCore.Services
                 _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
                 foreach (var t in enTransactions)
                 {
-                    var poolsUsed = GetPoolUsedFromTransaction(t);
+                    IEnumerable<JToken> poolsUsed;
+                    try
+                    {
+                        poolsUsed = GetPoolUsedFromTransaction(t);
+                    }
+                    catch (AggregateException)
+                    {
+                        return;
+                    }
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
                     {
