@@ -453,7 +453,14 @@ namespace AnalyzerCore.Services
                     IEnumerable<JToken>? poolsUsed = null;
                     while (poolsUsed == null)
                     {
-                        poolsUsed = GetPoolUsedFromTransaction(t);
+                        try
+                        {
+                            poolsUsed = GetPoolUsedFromTransaction(t);
+                        }
+                        catch (AggregateException)
+                        {
+                            poolsUsed = null;
+                        }
                     }
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
