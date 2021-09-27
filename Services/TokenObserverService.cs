@@ -95,7 +95,7 @@ namespace AnalyzerCore.Services
             }
         }
 
-        private IEnumerable<JToken> GetPoolUsedFromTransaction(Transaction enT)
+        private IEnumerable<JToken>? GetPoolUsedFromTransaction(Transaction enT)
         {
             var logsList = _web3.Eth.Transactions.GetTransactionReceipt
                 .SendRequestAsync(enT.TransactionHash);
@@ -450,14 +450,10 @@ namespace AnalyzerCore.Services
                 _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
                 foreach (var t in enTransactions)
                 {
-                    IEnumerable<JToken> poolsUsed;
-                    try
+                    IEnumerable<JToken>? poolsUsed = null;
+                    while (poolsUsed == null)
                     {
                         poolsUsed = GetPoolUsedFromTransaction(t);
-                    }
-                    catch (AggregateException)
-                    {
-                        return;
                     }
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
