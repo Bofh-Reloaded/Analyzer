@@ -95,6 +95,13 @@ namespace AnalyzerCore.Services
             }
         }
 
+        private Task<TransactionReceipt> GetTransactionReceipt(string txHash)
+        {
+            var result = _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash);
+            result.Wait();
+            return result;
+        }
+
         private IEnumerable<JToken>? GetPoolUsedFromTransaction(Transaction enT)
         {
             var policy = Policy.Handle<Exception>()
@@ -103,9 +110,9 @@ namespace AnalyzerCore.Services
                     _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
                 });
             var result = policy.Execute(
-                () => _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(enT.TransactionHash));
-            result.Wait();
-
+                () => GetTransactionReceipt(enT.TransactionHash)
+            );
+            
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
