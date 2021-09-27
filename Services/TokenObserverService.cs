@@ -97,11 +97,16 @@ namespace AnalyzerCore.Services
 
         private IEnumerable<JToken>? GetPoolUsedFromTransaction(Transaction enT)
         {
-            var logsList = _web3.Eth.Transactions.GetTransactionReceipt
-                .SendRequestAsync(enT.TransactionHash);
-            logsList.Wait();
+            var policy = Policy.Handle<Exception>()
+                .Retry(3, onRetry: (exception, retryCount, context) =>
+                {
+                    _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
+                });
+            var result = policy.Execute(
+                () => _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(enT.TransactionHash));
+            result.Wait();
 
-            var syncEventsInLogs = logsList.Result.Logs.Where(
+            var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
             ).ToList();
