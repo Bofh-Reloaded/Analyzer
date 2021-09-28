@@ -99,6 +99,7 @@ namespace AnalyzerCore.Services
         {
             var result = _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash);
             result.Wait();
+            if (result == null) throw new NullReferenceException();
             return result;
         }
 
