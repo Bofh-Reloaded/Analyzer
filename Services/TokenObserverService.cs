@@ -181,7 +181,11 @@ namespace AnalyzerCore.Services
             {
                 if (!knownToken.Contains(token.TokenAddress)) continue;
                 _log.Information($"Deleting messageId: {token.TelegramMsgId}...");
-                await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
+                var result = await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
+                if (result == false )
+                {
+                    await telegramNotifier.EditMessageAsync(token.TelegramMsgId, token.TokenSymbol);
+                }
                 token.Deleted = true;
                 await context.SaveChangesAsync();
             }

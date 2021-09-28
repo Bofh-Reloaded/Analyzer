@@ -58,16 +58,32 @@ namespace AnalyzerCore.Notifier
             }
         }
 
-        public async Task DeleteMessageAsync(int messageId)
+        public async Task<bool> DeleteMessageAsync(int messageId)
         {
             try
             {
                 _log.Debug($"Deleting messageId: {messageId} inside chat: {_chatId}");
                 await _bot.DeleteMessageAsync(_chatId, messageId);
+                return true;
             }
             catch (Exception e)
             {
                 _log.Error(e.Message);
+                return false;
+            }
+        }
+
+        public async Task<bool> EditMessageAsync(int messageId, string token)
+        {
+            try
+            {
+                _log.Debug($"Editing message: {messageId} inside chat: {_chatId}");
+                await _bot.EditMessageTextAsync(_chatId, messageId, $"Token {token} has been added.");
+                return true;
+            } catch (Exception e)
+            {
+                _log.Error(e.Message);
+                return false;
             }
         }
         
