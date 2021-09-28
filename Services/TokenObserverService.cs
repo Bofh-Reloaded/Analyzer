@@ -272,7 +272,8 @@ namespace AnalyzerCore.Services
                 {
                     var msg = string.Join(
                         Environment.NewLine,
-                        $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>] {string.Concat(Enumerable.Repeat(star, t.TxCount))}:</b>",
+                        $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
+                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
                         $"  token address: {t.TokenAddress}",
                         $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                         $"  totalTxCount: {t.TxCount.ToString()}",
