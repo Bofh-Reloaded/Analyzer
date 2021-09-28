@@ -98,8 +98,17 @@ namespace AnalyzerCore.Services
         private Task<TransactionReceipt> GetTransactionReceipt(string txHash)
         {
             var result = _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash);
+            if (result == null)
+            {
+                _log.Error("result step 1 null");
+                throw new NullReferenceException();
+            }
             result.Wait();
-            if (result == null) throw new NullReferenceException();
+            if (result == null)
+            {
+                _log.Error("result step 2 null");
+                throw new NullReferenceException();
+            }
             return result;
         }
 
