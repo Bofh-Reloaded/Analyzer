@@ -1,9 +1,9 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,12 +29,11 @@ namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService
     {
-        private const string TASK_VERSION = "0.9.1-db-persistance-websocket";
+        private const string TaskVersion = "0.9.1-db-persistance-websocket";
 
-        private const string TASK_SYNC_EVENT_ADDRESS =
+        private const string TaskSyncEventAddress =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
-
-        private const int TASK_TASK_DELAY_MS = 60000;
+        
         private readonly string _baseUri;
         private readonly string _chainName;
 
@@ -51,6 +50,8 @@ namespace AnalyzerCore.Services
 
         private TokenListConfig _tokenList = null!;
         private readonly AnalyzerConfig _config;
+
+        private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
 
         public TokenObserverService(AnalyzerConfig config)
@@ -88,7 +89,7 @@ namespace AnalyzerCore.Services
             foreach (var token in notifiedTokens)
             {
                 if (!knownToken.Contains(token.TokenAddress)) continue;
-                _log.Information($"Deleting messageId: {token.TelegramMsgId}...");
+                _log.Information("Deleting messageId: {TelegramMsgId}...", token.TelegramMsgId);
                 await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
                 token.Deleted = true;
                 await context.SaveChangesAsync();
@@ -125,7 +126,7 @@ namespace AnalyzerCore.Services
             
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
-                    TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
+                    TaskSyncEventAddress, StringComparison.Ordinal)
             ).ToList();
 
             return syncEventsInLogs.Count == 0
@@ -176,7 +177,9 @@ namespace AnalyzerCore.Services
                     if (toCheck?.TransactionHashes.FirstOrDefault(k => k.Hash == txHash) !=
                         null)
                     {
-                        _log.Information($"We already seen token: {token} within txHash: {txHash}, skipping...");
+                        _log.Information("We already seen token: {Token} within txHash: {TxHash}, skipping...",
+                            token,
+                            txHash);
                         return;
                     }
 
@@ -200,7 +203,7 @@ namespace AnalyzerCore.Services
                     }
                     else
                     {
-                        _log.Error($"Error retrieving entity for Token: {token}, database is not update");
+                        _log.Error("Error retrieving entity for Token: {Token}, database is not update", token);
                     }
 
                     db.SaveChanges();
@@ -209,6 +212,11 @@ namespace AnalyzerCore.Services
                 {
                     // CREATE TOKEN
                     // Create the object inside the dictionary since it's the first time that we see it
+                    if (_inMemorySeenToken.Contains(token))
+                    {
+                        _log.Warning("Token: {Token} already processed, avoid duplicate", token);
+                    }
+                    _inMemorySeenToken.Add(token);
                     db.Tokens.Add(new DbLayer.Models.TokenEntity
                     {
                         TokenAddress = token,
@@ -242,85 +250,34 @@ namespace AnalyzerCore.Services
                 var totalTransactionsCount = db.Tokens.Where(entity => entity.TokenAddress == token)
                     .Select(e => e.TxCount).FirstOrDefault();
                 _log.Information(
-                    $"Found missing Token: {token} with TxHash: {txHash} with {totalExchangesFound} pools, total txCount: {totalTransactionsCount}");
+                    "Found missing Token: {Token} with TxHash: {TxHash} with {TotalExchangesFound} pools, total txCount: {TotalTransactionsCount}",
+                token,
+                    txHash,
+                    totalExchangesFound.ToString(),
+                    totalTransactionsCount.ToString());
             }
             catch (Exception ex)
             {
-                _log.Error(ex.Message);
+                _log.Error("{Message}", ex.Message);
                 throw;
-            }
-        }
-
-        private async Task NotifyMissingTokens()
-        {
-            await using var context = new TokenDbContext();
-            var query = context.Tokens.Where(t => t.Notified == false);
-            var tokenToNotify = query.ToList();
-            _log.Debug($"MissingTokens: {tokenToNotify.ToList().Count.ToString()}");
-            if (tokenToNotify.ToList().Count <= 0)
-            {
-                _log.Information("No Missing token found this time");
-                return;
-            }
-
-            foreach (var t in tokenToNotify)
-            {
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.Exchanges)
-                    .LoadAsync();
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.Pools)
-                    .LoadAsync();
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.TransactionHashes)
-                    .LoadAsync();
-                const string star = "\U00002B50";
-                var transactionHash = t.TransactionHashes.FirstOrDefault()?.Hash;
-                var pools = t.Pools.ToList();
-                if (transactionHash != null)
-                {
-                    var msg = string.Join(
-                        Environment.NewLine,
-                        $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
-                        $"  token address: {t.TokenAddress}",
-                        $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
-                        $"  totalTxCount: {t.TxCount.ToString()}",
-                        $"  lastTxSeen: <a href='{_baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
-                        $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
-                        $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                        $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{_baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{_baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        $"  version: {TASK_VERSION}"
-                    );
-
-                    _log.Information(JsonConvert.SerializeObject(msg, Formatting.Indented));
-                    var notifierResponse = await _telegramNotifier.SendMessageWithReturnAsync(msg);
-
-                    t.Notified = true;
-                    if (notifierResponse != null) t.TelegramMsgId = notifierResponse.MessageId;
-                }
-
-                await context.SaveChangesAsync();
-                await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information($"Starting TokenObserverService for chain: {_chainName} with version: {TASK_VERSION}");
+            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}", _chainName, TaskVersion);
             _telegramNotifier.SendMessage(
-                $"Starting TokenObserverService for chain: {_chainName} with version: {TASK_VERSION}");
+                $"Starting TokenObserverService for chain: {_chainName} with version: {TaskVersion}");
             stoppingToken.Register(() =>
                 {
-                    _log.Information($"TokenObserverService background task is stopping for chain: {_chainName}");
+                    _log.Information("TokenObserverService background task is stopping for chain: {ChainName}", _chainName);
                 }
             );
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                var uri = $"ws://{_config.RpcEndpoints.First()}:{_config.WssPort}";
-                _log.Information($"Using WebSocket on: {uri}");
+                var uri = $"ws://{_config.RpcEndpoints.First()}:{_config.WssPort.ToString()}";
+                _log.Information("Using WebSocket on: {Uri}", uri);
                 using var client = new StreamingWebSocketClient(uri);
                 // create the subscription
                 // (it won't start receiving data until Subscribe is called)
@@ -344,18 +301,18 @@ namespace AnalyzerCore.Services
                     lastBlockNotification = DateTime.Now;
                     var utcTimestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value);
                     _log.Warning(
-                        $"New Block. Number: {block.Number.Value}, Timestamp UTC: {JsonConvert.SerializeObject(utcTimestamp)}, Seconds since last block received: {secondsSinceLastBlock} ");
+                        "New Block. Number: {Block}, Timestamp UTC: {TimeStamp}, Seconds since last block received: {SecondsSinceLastBlock}",
+                        block.Number.Value,
+                        JsonConvert.SerializeObject(utcTimestamp.ToString()),
+                        secondsSinceLastBlock);
                     await ProcessNewBlock(block, stoppingToken);
                 });
-
-                var subscribed = true;
 
                 // handle unsubscription
                 // optional - but may be important depending on your use case
                 subscription.GetUnsubscribeResponseAsObservable().Subscribe(response =>
                 {
-                    subscribed = false;
-                    _log.Warning("Block Header unsubscribe result: " + response);
+                    _log.Warning("Block Header unsubscribe result: {Response}", response);
                 });
 
                 // open the websocket connection
@@ -370,11 +327,11 @@ namespace AnalyzerCore.Services
                 while (subscription.SubscriptionState is SubscriptionState.Subscribed or SubscriptionState.Subscribing)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-                    _log.Warning(subscription.SubscriptionState.ToString());
+                    _log.Warning("{SubscriptionState}", subscription.SubscriptionState);
                     secondsSinceLastBlock = (lastBlockNotification == null)
                         ? 0
                         : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
-                    _log.Warning($"Last block notification: {secondsSinceLastBlock} seconds ago");
+                    _log.Warning("Last block notification: {SecondsSinceLastBlock} seconds ago", secondsSinceLastBlock);
                     if (!(secondsSinceLastBlock > 20)) continue;
                     _log.Error("Websocket streaming bugged, restarting...");
                     await subscription.UnsubscribeAsync();
@@ -408,7 +365,7 @@ namespace AnalyzerCore.Services
 
         private async Task ProcessNewBlock(Block block, CancellationToken cancellationToken)
         {
-            _log.Information($"New Block Received: {block.Number.Value}");
+            _log.Information("New Block Received: {Block}", block.Number.Value);
 
             List<string> completeTokenList = ReloadTokenList();
 
@@ -437,7 +394,7 @@ namespace AnalyzerCore.Services
                     blockTransactions = null;
                 }
             });*/
-            BlockWithTransactions blockTransactions = null;
+            BlockWithTransactions? blockTransactions;
             try
             {
                 blockTransactions = await
@@ -446,7 +403,7 @@ namespace AnalyzerCore.Services
             }
             catch (Exception e)
             {
-                _log.Error(e.Message);
+                _log.Error("{Message}", e.Message);
                 return;
             }
 
@@ -456,7 +413,9 @@ namespace AnalyzerCore.Services
             if (blockTransactions != null)
             {
                 _log.Information(
-                    $"Transaction inside block [{block.Number.Value}]: {blockTransactions.Transactions.Length}");
+                    "Transaction inside block [{Block}]: {BlockTransactions}",
+                    block.Number.Value.Sign,
+                    blockTransactions.Transactions.Length);
 
                 // Select only transaction from the address that we need analyze
                 var transactionsToAnalyze = new List<Transaction>();
@@ -470,7 +429,7 @@ namespace AnalyzerCore.Services
                 }
 
                 var enTransactions = transactionsToAnalyze.ToList();
-                _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
+                _log.Debug("Total transaction to analyze: {TransactionsCount}", enTransactions.Count.ToString());
                 foreach (var t in enTransactions)
                 {
                     IEnumerable<JToken>? poolsUsed = null;
@@ -500,16 +459,21 @@ namespace AnalyzerCore.Services
                                 // Skip this token if we already have it
                                 if (completeTokenList.Contains(token))
                                 {
-                                    _log.Debug($"Token: {token} already known.");
+                                    _log.Debug("Token: {Token} already known", token);
                                     continue;
                                 }
 
-                                _log.Debug($"[ ] Token: {token}");
+                                _log.Debug("[ ] Token: {Token}", token);
                                 var tokenContractHandler = _web3.Eth.GetContractHandler(token);
                                 var tokenSymbol = await tokenContractHandler.QueryAsync<SymbolFunction, string>();
                                 var tokenTotalSupply = await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
                                 _log.Debug(
-                                    $"[  ] {tokenSymbol} {tokenTotalSupply.ToString()} {t.TransactionHash} {poolFactory.Result}");
+                                    "[  ] {TokenSymbol} {TokenTotalSupply} {TransactionHash} {PoolFactory}",
+                                    tokenSymbol,
+                                    tokenTotalSupply.ToString(),
+                                    t.TransactionHash,
+                                    poolFactory.Result
+                                    );
                                 ProcessTokenAndPersistInDb(
                                     token,
                                     tokenSymbol,
@@ -521,14 +485,14 @@ namespace AnalyzerCore.Services
                         }
                         catch (Exception e)
                         {
-                            _log.Error(e.ToString());
+                            _log.Error("{Message}", e.ToString());
                         }
                     }
                 }
             }
 
             _log.Information("Analysis complete");
-            await NotifyMissingTokens();
+            await _telegramNotifier.NotifyMissingTokens(_baseUri, TaskVersion);
             _log.Information("Cleaning Tokens");
             // Clean up Telegram
             await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AnalyzerCore.DbLayer;
+using Newtonsoft.Json;
 using Serilog;
 using Serilog.Context;
 using Serilog.Events;
@@ -44,7 +46,7 @@ namespace AnalyzerCore.Notifier
         {
             try
             {
-                _log.Debug(text);
+                _log.Debug("{Text}", text);
                 await _bot.SendTextMessageAsync(
                     _chatId,
                     text,
@@ -54,7 +56,7 @@ namespace AnalyzerCore.Notifier
             }
             catch (Exception r)
             {
-                _log.Error(r.Message);
+                _log.Error("{Message}", r.Message);
             }
         }
 
@@ -62,20 +64,74 @@ namespace AnalyzerCore.Notifier
         {
             try
             {
-                _log.Debug($"Deleting messageId: {messageId} inside chat: {_chatId}");
+                _log.Debug("Deleting messageId: {MessageId} inside chat: {ChatId}", messageId, _chatId);
                 await _bot.DeleteMessageAsync(_chatId, messageId);
             }
             catch (Exception e)
             {
-                _log.Error(e.Message);
+                _log.Error("{Message}", e.Message);
             }
         }
-        
+
+        public async Task NotifyMissingTokens(string baseUri, string version)
+        {
+            await using var context = new TokenDbContext();
+            var query = context.Tokens.Where(t => t.Notified == false);
+            var tokenToNotify = query.ToList();
+            _log.Debug("MissingTokens: {MissingTokens}", tokenToNotify.ToList().Count.ToString());
+            if (tokenToNotify.ToList().Count <= 0)
+            {
+                _log.Information("No Missing token found this time");
+                return;
+            }
+
+            foreach (var t in tokenToNotify)
+            {
+                await context.Entry(t)
+                    .Collection(tokenEntity => tokenEntity.Exchanges)
+                    .LoadAsync();
+                await context.Entry(t)
+                    .Collection(tokenEntity => tokenEntity.Pools)
+                    .LoadAsync();
+                await context.Entry(t)
+                    .Collection(tokenEntity => tokenEntity.TransactionHashes)
+                    .LoadAsync();
+                const string star = "\U00002B50";
+                var transactionHash = t.TransactionHashes.FirstOrDefault()?.Hash;
+                var pools = t.Pools.ToList();
+                if (transactionHash != null)
+                {
+                    var msg = string.Join(
+                        Environment.NewLine,
+                        $"<b>{t.TokenSymbol} [<a href='{baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
+                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
+                        $"  token address: {t.TokenAddress}",
+                        $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
+                        $"  totalTxCount: {t.TxCount.ToString()}",
+                        $"  lastTxSeen: <a href='{baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
+                        $"  from: <a href='{baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                        $"  to: <a href='{baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                        $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                        $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                        $"  version: {version}"
+                    );
+                    _log.Information("{MsgSerialized}", JsonConvert.SerializeObject(msg, Formatting.Indented));
+                    var notifierResponse = await SendMessageWithReturnAsync(msg);
+
+                    t.Notified = true;
+                    if (notifierResponse != null) t.TelegramMsgId = notifierResponse.MessageId;
+                }
+
+                await context.SaveChangesAsync();
+                await Task.Delay(TimeSpan.FromSeconds(5));
+            }
+        }
+
         public async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
         {
             try
             {
-                _log.Debug(text);
+                _log.Debug("{Text}", text);
                 var resp = await _bot.SendTextMessageAsync(
                     _chatId,
                     text,
@@ -86,10 +142,9 @@ namespace AnalyzerCore.Notifier
             }
             catch (Exception r)
             {
-                _log.Error(r.Message);
+                _log.Error("{Message}", r.Message);
                 return null;
             }
-
         }
 
         public async void SendStatsRecap(Message message)
@@ -155,7 +210,8 @@ namespace AnalyzerCore.Notifier
                     }
             }
 
-            m.Add($"\U0001F4CATotal TRX on last 500B: {message.TotalTrx.ToString()}, Average TPS: {message.Tps}\U0001F4CA");
+            m.Add(
+                $"\U0001F4CATotal TRX on last 500B: {message.TotalTrx.ToString()}, Average TPS: {message.Tps}\U0001F4CA");
             var _ = await _bot.SendTextMessageAsync(
                 _chatId,
                 Join(Environment.NewLine, m.ToArray()),
