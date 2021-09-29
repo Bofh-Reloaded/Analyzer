@@ -164,7 +164,7 @@ namespace AnalyzerCore.Services
         {
             try
             {
-                _log.Information($"EvaluateToken: {token} with txHash: {txHash}");
+                _log.Information("EvaluateToken: {Token} with txHash: {TxHash}", token, txHash);
                 using var db = new TokenDbContext();
                 // If the token is not present in the database, let's add it.
                 var tokenToCheck = db.Tokens.FirstOrDefault(tokenEntity => tokenEntity.TokenAddress == token);
@@ -230,15 +230,15 @@ namespace AnalyzerCore.Services
                     });
                     db.SaveChanges();
                     var entity = db.Tokens.FirstOrDefault(e => e.TokenAddress == token);
-                    entity?.Exchanges.Add(new DbLayer.Models.Exchange()
+                    entity?.Exchanges.Add(new DbLayer.Models.Exchange
                     {
                         Address = exchangeAddress.ToLower()
                     });
-                    entity?.Pools.Add(new DbLayer.Models.Pool()
+                    entity?.Pools.Add(new DbLayer.Models.Pool
                     {
                         Address = poolAddress.ToLower()
                     });
-                    entity?.TransactionHashes.Add(new DbLayer.Models.TransactionHash()
+                    entity?.TransactionHashes.Add(new DbLayer.Models.TransactionHash
                     {
                         Hash = t.TransactionHash
                     });

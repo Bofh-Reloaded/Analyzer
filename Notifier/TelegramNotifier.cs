@@ -24,6 +24,8 @@ namespace AnalyzerCore.Notifier
 
         private readonly ChatId _chatId;
 
+        private readonly List<string> _inMemorySeenToken = new List<string>();
+
         public TelegramNotifier(string chatId, string botToken)
         {
             _chatId = chatId;
@@ -116,6 +118,8 @@ namespace AnalyzerCore.Notifier
                         $"  version: {version}"
                     );
                     _log.Information("{MsgSerialized}", JsonConvert.SerializeObject(msg, Formatting.Indented));
+                    if (_inMemorySeenToken.Contains(t.TokenAddress.ToLower())) return;
+                    _inMemorySeenToken.Add(t.TokenAddress.ToLower());
                     var notifierResponse = await SendMessageWithReturnAsync(msg);
 
                     t.Notified = true;
