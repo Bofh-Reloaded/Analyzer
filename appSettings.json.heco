@@ -1,38 +1,42 @@
 {
   "AnalyzerConfig": {
-    "ChainName": "Polygon",
+    "ChainName": "Heco",
     "RpcEndpoints": [
-      "polygon-rpc.com"
+      "39.103.184.118"
     ],
     "RpcPort": 8545,
     "WssPort": 8546,
     "Enemies": [
-      "0xb20d42e335f203d4421cab57a543b29ea590e69e",
-      "0x28e73c83c0f85784543300b96a1a3c2e900f7a35",
-      "0x484f20426f84836648d75f81fd3213694c38c4bf",
-      "0x0b1413e95202570287f490f6cae04f60ec1018be",
-      "0x22a895db1934daf1c12bbcd67c0d7b6647c1d9e5",
-      "0x8f96e3c0b4df15edca72a82775f6f49988917921",
-      "0xb20d42e335f203d4421cab57a543b29ea590e69e",
-      "0xa8d432e91f5c211d2de987c458b84a72713908df"
+      "0x9243121fa80defa6d0f8310c5596d6070a9dfd58",
+      "0x71db7ef71e1196262f88b8152bcb727f893352fc",
+      "0xa7df0f4affe5cc11df55c59e56fde237f4b42371",
+      "0x4b7536c40074cb9b877c3c46157f5c29140c1c59",
+      "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
+      "0xdcfe9c1496ea947abc9ac072381e7f3076fb8dde",
+      "0xed7d5f38c79115ca12fe6c0041abb22f0a06c300",
+      "0xa9ae6152cb298c7e0d36a71ecd2b1602e8dcc3a0",
+      "0xa8d04261e89f460bbefd4796f112ca543f34c1d5",
+      "0x4b7536c40074cb9b877c3c46157f5c29140c1c59",
+      "0xe283644f7430cf2748bf84e3085357c7b81240d6",
+      "0x85e26438f89421a8c90187c0082031f3705389f3"
     ],
-    "Address": "0xec009815b473459cb8da30f6cf9c6e91c286d7fe",
+    "Address": "0x5992caa2a5da1437671204977dc0256abc37bf01",
     "ServicesConfig": {
       "DataCollector": {
-        "Enabled": true
+        "Enabled": false
       },
       "AnalyzerService": {
-        "Enabled": true,
-        "BotToken": "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo",
-        "ChatId": "-532850503",
+        "Enabled": false,
+        "BotToken": "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g",
+        "ChatId": "-516536036",
         "BlockDurationTime": 5
       },
       "TokenAnalyzer": {
         "Enabled": true,
-        "TokenFileName": "polygon_tokenlists.data",
-        "BotToken": "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo",
-        "ChatId": "-568322563",
-        "BaseUri": "https://polygonscan.com/"
+        "TokenFileName": "heco_tokenlists.data",
+        "BotToken": "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g",
+        "ChatId": "-559396494",
+        "BaseUri": "https://hecoinfo.com/"
       },
       "NewTokenService": {
         "Enabled": false
