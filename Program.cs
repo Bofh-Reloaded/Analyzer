@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using CommandLine;
 using AnalyzerCore.Models;
 using AnalyzerCore.Services;
 using Microsoft.Extensions.Configuration;
@@ -14,7 +15,15 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
-        private const string TASK_VERSION = "0.9.2.1-db-persistance-websocket";
+        private const string TASK_VERSION = "0.9.3-db-persistance-websocket";
+
+        private static string _configFileName;
+
+        private class Options
+        {
+            [Option('c', "config", Required = true, HelpText = "config file to load")]
+            public string Config { get; set; }
+        }
 
         private static void Main(string[] args)
         {
@@ -28,6 +37,15 @@ namespace AnalyzerCore
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
+
+            Parser.Default.ParseArguments<Options>(args)
+                .WithParsed<Options>(o =>
+                {
+                    if (o.Config.Length > 0)
+                    {
+                        _configFileName = o.Config;
+                    }
+                });
 
             CreateHostBuilder(args).Build().Run();
         }

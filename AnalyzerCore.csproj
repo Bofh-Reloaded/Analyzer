@@ -8,6 +8,7 @@
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.0-preview1" />
     <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
     <PackageReference Include="JSON.net" Version="1.0.33" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.10" />
@@ -61,18 +62,21 @@
     <Folder Include="Notifier\" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="appSettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="tokens.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="appSettings.ply.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appSettings.heco.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
     <None Remove="appSettings.json.bsc" />
     <None Remove="local.db" />
     <Content Include="appSettings.json.bsc">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Remove="bsc_tokenlists.data" />
     <Content Include="bsc_tokenlists.data">
