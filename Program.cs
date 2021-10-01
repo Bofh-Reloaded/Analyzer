@@ -58,7 +58,7 @@ namespace AnalyzerCore
                     // Define Configuration File Reader
                     IConfiguration configuration = new ConfigurationBuilder()
                         .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                        .AddJsonFile("appSettings.json", false, true)
+                        .AddJsonFile(_configFileName, false, true)
                         .Build();
 
                     // Map json configuration inside Object
