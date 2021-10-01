@@ -14,6 +14,8 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
+        private const string Version = "0.9.2-db-persistance-websocket";
+
         private static void Main(string[] args)
         {
             var log = new LoggerConfiguration()
@@ -50,21 +52,21 @@ namespace AnalyzerCore
                     if (analyzerConfig.ServicesConfig.AnalyzerService.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new AnalyzerService(analyzerConfig, plyDataHandler)
+                            _ => new AnalyzerService(analyzerConfig, plyDataHandler, Version)
                         );
                     }
 
                     if (analyzerConfig.ServicesConfig.TokenAnalyzer.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(analyzerConfig)
+                            _ => new TokenObserverService(analyzerConfig, Version)
                         );
                     }
 
                     if (analyzerConfig.ServicesConfig.DataCollector.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(analyzerConfig, plyDataHandler)
+                            _ => new DataCollectorService(analyzerConfig, plyDataHandler, Version)
                         );
                     }
                 });

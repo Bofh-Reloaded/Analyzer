@@ -1,0 +1,48 @@
+{
+  "AnalyzerConfig": {
+    "ChainName": "Heco",
+    "RpcEndpoints": [
+      "39.103.184.118"
+    ],
+    "RpcPort": 8545,
+    "WssPort": 8546,
+    "Enemies": [
+      "0x9243121fa80defa6d0f8310c5596d6070a9dfd58",
+      "0x71db7ef71e1196262f88b8152bcb727f893352fc",
+      "0xa7df0f4affe5cc11df55c59e56fde237f4b42371",
+      "0x4b7536c40074cb9b877c3c46157f5c29140c1c59",
+      "0xa5f2b51aa0fa4be37f372622e28ed5a661802a68",
+      "0xdcfe9c1496ea947abc9ac072381e7f3076fb8dde",
+      "0xed7d5f38c79115ca12fe6c0041abb22f0a06c300",
+      "0xa9ae6152cb298c7e0d36a71ecd2b1602e8dcc3a0",
+      "0xa8d04261e89f460bbefd4796f112ca543f34c1d5",
+      "0x4b7536c40074cb9b877c3c46157f5c29140c1c59",
+      "0xe283644f7430cf2748bf84e3085357c7b81240d6",
+      "0x85e26438f89421a8c90187c0082031f3705389f3"
+    ],
+    "Address": "0x5992caa2a5da1437671204977dc0256abc37bf01",
+    "ServicesConfig": {
+      "DataCollector": {
+        "Enabled": false
+      },
+      "AnalyzerService": {
+        "Enabled": false,
+        "BotToken": "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g",
+        "ChatId": "-516536036",
+        "BlockDurationTime": 5
+      },
+      "TokenAnalyzer": {
+        "Enabled": true,
+        "TokenFileName": "heco_tokenlists.data",
+        "BotToken": "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g",
+        "ChatId": "-559396494",
+        "BaseUri": "https://hecoinfo.com/"
+      },
+      "NewTokenService": {
+        "Enabled": false
+      },
+      "MaxParallelism": 24
+    }
+  }
+}
+

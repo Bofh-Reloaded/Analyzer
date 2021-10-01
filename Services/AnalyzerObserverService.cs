@@ -20,8 +20,6 @@ namespace AnalyzerCore.Services
         // Define the delay between one cycle and another
         private const int TASK_TASK_DELAY_MS = 360000;
 
-        private const string TASK_VERSION = "0.9-db-persistance-websocket";
-
         // Array of block to analyze
         private static readonly List<int> NumbersOfBlocksToAnalyze = new List<int>() { 25, 100, 500 };
 
@@ -30,6 +28,7 @@ namespace AnalyzerCore.Services
 
         private readonly int _blockDurationTime;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
+        private readonly string _version;
 
         // String Value representing the chain name
         private readonly string _chainName;
@@ -43,7 +42,7 @@ namespace AnalyzerCore.Services
         private readonly TelegramNotifier _telegramNotifier;
         private IDisposable _cancellation;
 
-        public AnalyzerService(AnalyzerConfig config, DataCollectorService.ChainDataHandler chainDataHandler)
+        public AnalyzerService(AnalyzerConfig config, DataCollectorService.ChainDataHandler chainDataHandler, string version)
         {
             if (config.ServicesConfig.AnalyzerService.BlockDurationTime <= 0)
                 throw new ArgumentOutOfRangeException(nameof(config.ServicesConfig.AnalyzerService.BlockDurationTime));
@@ -56,6 +55,7 @@ namespace AnalyzerCore.Services
             _blockDurationTime = config.ServicesConfig.AnalyzerService.BlockDurationTime;
             _ourAddress = config.Address;
             _chainDataHandler = chainDataHandler;
+            _version = version;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -124,13 +124,14 @@ namespace AnalyzerCore.Services
                     _log.Information($"TRX to analyze: {trxToAnalyze.Count().ToString()}");
 
                     // Calculate the success rate and construct che BlockRangeStat object
+                    int v = (100 * succededTrxs.Count / trxToAnalyze.Count);
                     var blockRangeStats = new BlockRangeStats
                     {
                         BlockRange = numberOfBlocks,
                         SuccededTranstactionsPerBlockRange = succededTrxs.Count,
                         TotalTransactionsPerBlockRange = trxToAnalyze.Count,
                         SuccessRate = succededTrxs.Count > 0
-                            ? $"{(100 * succededTrxs.Count / trxToAnalyze.Count).ToString()}%"
+                            ? $"{v.ToString()}%"
                             : "0"
                     };
                     if (string.Equals(address.ToLower(), _ourAddress.ToLower(), StringComparison.Ordinal))
@@ -182,8 +183,8 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information($"Starting AnalyzerService for chain: {_chainName}, version: {TASK_VERSION}");
-            _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}, version: {TASK_VERSION}");
+            _log.Information("Starting AnalyzerService for chain: {ChainName}, version: {Version}", _chainName, _version);
+            _telegramNotifier.SendMessage(string.Format("Starting AnalyzerService for chain: {0}, version: {1}", _chainName, _version));
             stoppingToken.Register(() =>
                 {
                     Unsubscribe();

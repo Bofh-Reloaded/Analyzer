@@ -24,15 +24,17 @@ namespace AnalyzerCore.Services
     public class NewTokenService : BackgroundService
     {
         private readonly string _wssUri;
+        private readonly string _version;
         private readonly Logger _log;
 
         private static string NewPairEvent { get; } =
             "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
 
-        public NewTokenService(string chainName)
+        public NewTokenService(string chainName, string version)
         {
             _chainName = chainName;
             _wssUri = "wss://bsc-ws-node.nariox.org:443";
+            _version = version;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)

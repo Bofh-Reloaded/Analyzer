@@ -29,8 +29,6 @@ namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService
     {
-        private const string TaskVersion = "0.9.1-db-persistance-websocket";
-
         private const string TaskSyncEventAddress =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
         
@@ -50,11 +48,11 @@ namespace AnalyzerCore.Services
 
         private TokenListConfig _tokenList = null!;
         private readonly AnalyzerConfig _config;
-
+        private readonly string _version;
         private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
 
-        public TokenObserverService(AnalyzerConfig config)
+        public TokenObserverService(AnalyzerConfig config, string version)
         {
             _chainName = config.ChainName;
             _telegramNotifier = new TelegramNotifier(config.ServicesConfig.TokenAnalyzer.ChatId,
@@ -64,6 +62,7 @@ namespace AnalyzerCore.Services
             _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort.ToString()}");
             _tokenFileName = config.ServicesConfig.TokenAnalyzer.TokenFileName;
             _config = config;
+            _version = version;
 
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -265,9 +264,9 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}", _chainName, TaskVersion);
+            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}", _chainName, _version);
             _telegramNotifier.SendMessage(
-                $"Starting TokenObserverService for chain: {_chainName} with version: {TaskVersion}");
+                $"Starting TokenObserverService for chain: {_chainName} with version: {_version}");
             stoppingToken.Register(() =>
                 {
                     _log.Information("TokenObserverService background task is stopping for chain: {ChainName}", _chainName);
@@ -371,29 +370,6 @@ namespace AnalyzerCore.Services
 
             // Retrieve Transactions inside the block
             _log.Information("getting transactions inside block");
-            /*var policy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(new[]
-                {
-                    TimeSpan.FromSeconds(1),
-                    TimeSpan.FromSeconds(2),
-                    TimeSpan.FromSeconds(3)
-                });
-            Task<BlockWithTransactions> blockTransactions = null;
-            await policy.ExecuteAsync(async () =>
-            {
-                blockTransactions =
-                    _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(
-                        new BlockParameter((ulong)block.Number.Value));
-                try
-                {
-                    blockTransactions.Wait(cancellationToken);
-                }
-                catch (Exception)
-                {
-                    blockTransactions = null;
-                }
-            });*/
             BlockWithTransactions? blockTransactions;
             try
             {
@@ -492,7 +468,7 @@ namespace AnalyzerCore.Services
             }
 
             _log.Information("Analysis complete");
-            await _telegramNotifier.NotifyMissingTokens(_baseUri, TaskVersion);
+            await _telegramNotifier.NotifyMissingTokens(_baseUri, _version);
             _log.Information("Cleaning Tokens");
             // Clean up Telegram
             await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);

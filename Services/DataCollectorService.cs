@@ -25,6 +25,7 @@ namespace AnalyzerCore.Services
 
         private readonly List<string> _addresses;
         private readonly ChainDataHandler _chainDataHandler;
+        private readonly string _version;
         private readonly string _chainName;
 
         private readonly Logger _log;
@@ -34,11 +35,12 @@ namespace AnalyzerCore.Services
         private readonly Web3 _web3;
         private HexBigInteger _oldBlock = new HexBigInteger(new BigInteger(0));
 
-        public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler)
+        public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler, string version)
         {
             _chainName = config.ChainName;
             _maxParallelism = config.ServicesConfig.MaxParallelism;
             _chainDataHandler = chainDataHandler;
+            _version = version;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
