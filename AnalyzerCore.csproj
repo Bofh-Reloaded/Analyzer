@@ -61,14 +61,17 @@
     <Folder Include="Notifier\" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="appSettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="tokens.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
+    <None Remove="appSettings.json.bsc" />
     <None Remove="local.db" />
-    <None Remove="appSettings.json" />
-    <Content Include="appSettings.json">
+    <Content Include="appSettings.json.bsc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <None Remove="bsc_tokenlists.data" />

@@ -14,7 +14,7 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
-        private const string Version = "0.9.2-db-persistance-websocket";
+        private const string TASK_VERSION = "0.9.2.1-db-persistance-websocket";
 
         private static void Main(string[] args)
         {
@@ -52,21 +52,21 @@ namespace AnalyzerCore
                     if (analyzerConfig.ServicesConfig.AnalyzerService.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new AnalyzerService(analyzerConfig, plyDataHandler, Version)
+                            _ => new AnalyzerService(analyzerConfig, plyDataHandler, TASK_VERSION)
                         );
                     }
 
                     if (analyzerConfig.ServicesConfig.TokenAnalyzer.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(analyzerConfig, Version)
+                            _ => new TokenObserverService(analyzerConfig, TASK_VERSION)
                         );
                     }
 
                     if (analyzerConfig.ServicesConfig.DataCollector.Enabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(analyzerConfig, plyDataHandler, Version)
+                            _ => new DataCollectorService(analyzerConfig, plyDataHandler, TASK_VERSION)
                         );
                     }
                 });
