@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
@@ -24,6 +25,7 @@ using Polly;
 using Serilog.Context;
 using Serilog.Events;
 using Serilog.Exceptions;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
@@ -97,6 +99,7 @@ namespace AnalyzerCore.Services
                 {
                     await telegramNotifier.EditMessageAsync(token.TelegramMsgId, $"token {token.TokenSymbol} added");
                 }
+
                 token.Deleted = true;
                 await context.SaveChangesAsync();
             }
@@ -110,12 +113,14 @@ namespace AnalyzerCore.Services
                 _log.Error("result step 1 null");
                 throw new NullReferenceException();
             }
+
             result.Wait();
             if (result == null)
             {
                 _log.Error("result step 2 null");
                 throw new NullReferenceException();
             }
+
             return result;
         }
 
@@ -132,7 +137,8 @@ namespace AnalyzerCore.Services
             var result = policy.Execute(
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
-            
+
+            _log.Debug(JsonSerializer.Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
@@ -225,6 +231,7 @@ namespace AnalyzerCore.Services
                     {
                         _log.Warning("Token: {Token} already processed, avoid duplicate", token);
                     }
+
                     _inMemorySeenToken.Add(token);
                     db.Tokens.Add(new DbLayer.Models.TokenEntity
                     {
@@ -260,7 +267,7 @@ namespace AnalyzerCore.Services
                     .Select(e => e.TxCount).FirstOrDefault();
                 _log.Information(
                     "Found missing Token: {Token} with TxHash: {TxHash} with {TotalExchangesFound} pools, total txCount: {TotalTransactionsCount}",
-                token,
+                    token,
                     txHash,
                     totalExchangesFound.ToString(),
                     totalTransactionsCount.ToString());
@@ -274,12 +281,14 @@ namespace AnalyzerCore.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}", _chainName, _version);
+            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}",
+                _chainName, _version);
             _telegramNotifier.SendMessage(
                 $"Starting TokenObserverService for chain: {_chainName} with version: {_version}");
             stoppingToken.Register(() =>
                 {
-                    _log.Information("TokenObserverService background task is stopping for chain: {ChainName}", _chainName);
+                    _log.Information("TokenObserverService background task is stopping for chain: {ChainName}",
+                        _chainName);
                 }
             );
 
@@ -428,6 +437,7 @@ namespace AnalyzerCore.Services
                             poolsUsed = null;
                         }
                     }
+
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
                     {
@@ -450,14 +460,15 @@ namespace AnalyzerCore.Services
                                 _log.Debug("[ ] Token: {Token}", token);
                                 var tokenContractHandler = _web3.Eth.GetContractHandler(token);
                                 var tokenSymbol = await tokenContractHandler.QueryAsync<SymbolFunction, string>();
-                                var tokenTotalSupply = await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                                var tokenTotalSupply =
+                                    await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
                                 _log.Debug(
                                     "[  ] {TokenSymbol} {TokenTotalSupply} {TransactionHash} {PoolFactory}",
                                     tokenSymbol,
                                     tokenTotalSupply.ToString(),
                                     t.TransactionHash,
                                     poolFactory.Result
-                                    );
+                                );
                                 ProcessTokenAndPersistInDb(
                                     token,
                                     tokenSymbol,
@@ -482,7 +493,7 @@ namespace AnalyzerCore.Services
             // Clean up Telegram
             _log.Information("Cleaning Tokens");
             await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);
-            
+
             // Update tokens
             _log.Information("Update Tokens Messages");
             await _telegramNotifier.UpdateMissingTokensAsync(_baseUri, _version);
