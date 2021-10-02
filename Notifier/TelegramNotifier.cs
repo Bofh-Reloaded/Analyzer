@@ -125,10 +125,13 @@ namespace AnalyzerCore.Notifier
                 );
                 var policy = Policy
                     .Handle<Exception>()
-                    .WaitAndRetryAsync(5, retryAttempt =>
+                    .WaitAndRetryAsync(10, retryAttempt =>
                         TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
                 if (_tokenTransactionsCount.ContainsKey(t.TokenAddress) &&
-                    _tokenTransactionsCount[t.TokenAddress] == t.TxCount) continue; 
+                    _tokenTransactionsCount[t.TokenAddress] == t.TxCount)
+                {
+                    _log.Warning("no updates on token: {tokenSymbol}", t.TokenSymbol);
+                } 
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
                     _chatId,
@@ -211,6 +214,11 @@ namespace AnalyzerCore.Notifier
             }
         }
 
+        public async Task<Telegram.Bot.Types.Message> EditMessageAsync(int msgId, string text)
+        {
+            var resp = await _bot.EditMessageTextAsync(_chatId, msgId, text);
+            return resp;
+        }
         public async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
         {
             try
