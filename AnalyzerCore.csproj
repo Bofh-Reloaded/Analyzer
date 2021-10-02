@@ -75,9 +75,6 @@
   <ItemGroup>
     <None Remove="appSettings.json.bsc" />
     <None Remove="local.db" />
-    <Content Include="appSettings.json.bsc">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <None Remove="bsc_tokenlists.data" />
   </ItemGroup>
 </Project>
