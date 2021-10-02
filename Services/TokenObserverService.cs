@@ -31,15 +31,18 @@ namespace AnalyzerCore.Services
     {
         private const string TaskSyncEventAddress =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
-        
+
         private readonly string _baseUri;
         private readonly string _chainName;
+        private readonly AnalyzerConfig _config;
+        private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
         private readonly Serilog.Core.Logger _log;
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
 
         private readonly string _tokenFileName;
+        private readonly string _version;
 
         private readonly Web3 _web3;
 
@@ -47,9 +50,6 @@ namespace AnalyzerCore.Services
         private IConfigurationRoot? _configuration;
 
         private TokenListConfig _tokenList = null!;
-        private readonly AnalyzerConfig _config;
-        private readonly string _version;
-        private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
 
         public TokenObserverService(AnalyzerConfig config, string version)
@@ -334,8 +334,6 @@ namespace AnalyzerCore.Services
                     if (!(secondsSinceLastBlock > 20)) continue;
                     _log.Error("Websocket streaming bugged, restarting...");
                     await subscription.UnsubscribeAsync();
-                    //await StopAsync(new CancellationToken());
-                    //await StartAsync(new CancellationToken());
                 }
             }
         }
@@ -467,11 +465,17 @@ namespace AnalyzerCore.Services
                 }
             }
 
+            // Notify new tokens found
             _log.Information("Analysis complete");
             await _telegramNotifier.NotifyMissingTokens(_baseUri, _version);
-            _log.Information("Cleaning Tokens");
+
             // Clean up Telegram
+            _log.Information("Cleaning Tokens");
             await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);
+            
+            // Update tokens
+            _log.Information("Update Tokens Messages");
+            await _telegramNotifier.UpdateMissingTokensAsync(_baseUri, _version);
         }
     }
 }

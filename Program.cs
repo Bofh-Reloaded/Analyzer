@@ -15,15 +15,9 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
-        private const string TASK_VERSION = "0.9.3-db-persistance-websocket";
+        private const string TASK_VERSION = "0.9.4-db-persistance-websocket";
 
         private static string _configFileName;
-
-        private class Options
-        {
-            [Option('c', "config", Required = true, HelpText = "config file to load")]
-            public string Config { get; set; }
-        }
 
         private static void Main(string[] args)
         {
@@ -88,6 +82,12 @@ namespace AnalyzerCore
                         );
                     }
                 });
+        }
+
+        private class Options
+        {
+            [Option('c', "config", Required = true, HelpText = "config file to load")]
+            public string Config { get; set; }
         }
     }
 }

@@ -30,26 +30,21 @@ public static class OpCodes
 }
 
 public partial class Token0Function : Token0FunctionBase
-{
-}
+{}
 
 [Function("token0", "address")]
 public class Token0FunctionBase : FunctionMessage
-{
-}
+{}
 
 public partial class Token1Function : Token1FunctionBase
-{
-}
+{}
 
 [Function("token1", "address")]
 public class Token1FunctionBase : FunctionMessage
-{
-}
+{}
 
 public partial class Token0OutputDTO : Token0OutputDTOBase
-{
-}
+{}
 
 [FunctionOutput]
 public class Token0OutputDTOBase : IFunctionOutputDTO
@@ -58,8 +53,7 @@ public class Token0OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class Token1OutputDTO : Token1OutputDTOBase
-{
-}
+{}
 
 [FunctionOutput]
 public class Token1OutputDTOBase : IFunctionOutputDTO
@@ -68,26 +62,21 @@ public class Token1OutputDTOBase : IFunctionOutputDTO
 }
 
 public partial class FactoryFunction : FactoryFunctionBase
-{
-}
+{}
 
 [Function("factory", "address")]
 public class FactoryFunctionBase : FunctionMessage
-{
-}
+{}
 
 public partial class TotalSupplyFunction : TotalSupplyFunctionBase
-{
-}
+{}
 
 [Function("totalSupply", "uint256")]
 public class TotalSupplyFunctionBase : FunctionMessage
-{
-}
+{}
 
 public partial class TransferEventDTO : TransferEventDTOBase
-{
-}
+{}
 
 [Event("Transfer")]
 public class TransferEventDTOBase : IEventDTO
@@ -102,17 +91,14 @@ public class TransferEventDTOBase : IEventDTO
 }
 
 public partial class SymbolFunction : SymbolFunctionBase
-{
-}
+{}
 
 [Function("symbol", "string")]
 public class SymbolFunctionBase : FunctionMessage
-{
-}
+{}
 
 public class PairCreatedEvent : PairCreatedEventBase
-{
-}
+{}
 
 [Event("PairCreated")]
 public class PairCreatedEventBase : IEventDTO

@@ -25,12 +25,12 @@ namespace AnalyzerCore.Services
 
         private readonly List<string> _addresses;
         private readonly ChainDataHandler _chainDataHandler;
-        private readonly string _version;
         private readonly string _chainName;
 
         private readonly Logger _log;
 
         private readonly int _maxParallelism;
+        private readonly string _version;
 
         private readonly Web3 _web3;
         private HexBigInteger _oldBlock = new HexBigInteger(new BigInteger(0));

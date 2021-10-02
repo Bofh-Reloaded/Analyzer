@@ -28,7 +28,6 @@ namespace AnalyzerCore.Services
 
         private readonly int _blockDurationTime;
         private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
-        private readonly string _version;
 
         // String Value representing the chain name
         private readonly string _chainName;
@@ -40,6 +39,7 @@ namespace AnalyzerCore.Services
 
         // Define the TelegramNotifier Instance
         private readonly TelegramNotifier _telegramNotifier;
+        private readonly string _version;
         private IDisposable _cancellation;
 
         public AnalyzerService(AnalyzerConfig config, DataCollectorService.ChainDataHandler chainDataHandler, string version)

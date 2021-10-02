@@ -8,6 +8,7 @@ namespace AnalyzerCore.DbLayer
         {
             [Key]
             public int HashId { get; set; }
+
             public string Hash { get; set; }
             public TokenEntity TokenEntity { get; set; }
         }

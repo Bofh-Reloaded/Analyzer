@@ -23,12 +23,16 @@ namespace AnalyzerCore.Services
 {
     public class NewTokenService : BackgroundService
     {
-        private readonly string _wssUri;
-        private readonly string _version;
-        private readonly Logger _log;
+        private static readonly TelegramBotClient Bot =
+            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
 
-        private static string NewPairEvent { get; } =
-            "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
+        private static readonly string TelegramChatId = "-502311043";
+        private static readonly string TokenFileName = "bsc_tokenlists.data";
+        private readonly string _chainName;
+        private readonly TokenDbContext _db;
+        private readonly Logger _log;
+        private readonly string _version;
+        private readonly string _wssUri;
 
         public NewTokenService(string chainName, string version)
         {
@@ -49,14 +53,9 @@ namespace AnalyzerCore.Services
             _db = new TokenDbContext();
             _log.Information("Starting Service");
         }
-        
-        private static readonly TelegramBotClient Bot =
-            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
 
-        private static readonly string TelegramChatId = "-502311043";
-        private static readonly string TokenFileName = "bsc_tokenlists.data";
-        private readonly string _chainName;
-        private readonly TokenDbContext _db;
+        private static string NewPairEvent { get; } =
+            "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
 
         private static string GetLinkFromElement(string element, string type = "token")
         {

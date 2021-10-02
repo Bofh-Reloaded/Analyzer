@@ -5,8 +5,7 @@ using Newtonsoft.Json;
 namespace AnalyzerCore.Models
 {
     public class ConfigurationModels
-    {
-    }
+    {}
 
     // Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse); 
     public class DataCollector

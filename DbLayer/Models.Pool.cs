@@ -8,6 +8,7 @@ namespace AnalyzerCore.DbLayer
         {
             [Key]
             public int PoolId { get; set; }
+
             public string Address { get; set; }
             public TokenEntity TokenEntity { get; set; }
         }
