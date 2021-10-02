@@ -133,9 +133,9 @@ namespace AnalyzerCore.Notifier
                 if (_tokenTransactionsCount.ContainsKey(t.TokenAddress) &&
                     _tokenTransactionsCount[t.TokenAddress] == t.TxCount)
                 {
-                    _log.Warning("no updates on token: {tokenSymbol}", t.TokenSymbol);
                     continue;
                 }
+                _log.Warning("update token: {tokenSymbol}", t.TokenSymbol);
 
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
@@ -148,21 +148,6 @@ namespace AnalyzerCore.Notifier
                     ParseMode.Html,
                     disableWebPagePreview: true)
                 );
-
-                try
-                {
-                    _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
-                    await _bot.EditMessageTextAsync(
-                        _chatId,
-                        t.TelegramMsgId,
-                        msg,
-                        ParseMode.Html,
-                        disableWebPagePreview: true);
-                }
-                catch (Telegram.Bot.Exceptions.MessageIsNotModifiedException)
-                {
-                    _log.Debug("no updates for token {token}", t.TokenId);
-                }
             }
         }
 
