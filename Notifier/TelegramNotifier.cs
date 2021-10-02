@@ -49,8 +49,8 @@ namespace AnalyzerCore.Notifier
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
-
             LoadTokenDictionaryWithTxCount();
+
         }
 
         public async void SendMessage(string text)
@@ -86,8 +86,15 @@ namespace AnalyzerCore.Notifier
 
         private void LoadTokenDictionaryWithTxCount()
         {
-            var f = System.IO.File.ReadAllText(TASK_TMP_FILE_NAME);
-            _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
+            try
+            {
+                var f = System.IO.File.ReadAllText(TASK_TMP_FILE_NAME);
+                _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
+            }
+            catch (Exception)
+            {
+                _log.Error("file {filename} not found, will be created later", TASK_TMP_FILE_NAME);
+            }
         }
 
         public async Task UpdateMissingTokensAsync(string baseUri, string version)
