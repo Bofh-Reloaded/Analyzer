@@ -148,13 +148,22 @@ namespace AnalyzerCore.Notifier
                 var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
                     new JsonSerializerOptions() { WriteIndented = true });
                 await System.IO.File.WriteAllTextAsync(TASK_TMP_FILE_NAME, jsonString);
-                await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
-                    _chatId,
-                    t.TelegramMsgId,
-                    msg,
-                    ParseMode.Html,
-                    disableWebPagePreview: true)
-                );
+
+                try
+                {
+                    await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
+                        _chatId,
+                        t.TelegramMsgId,
+                        msg,
+                        ParseMode.Html,
+                        disableWebPagePreview: true)
+                    );
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    continue;
+                }
             }
         }
 

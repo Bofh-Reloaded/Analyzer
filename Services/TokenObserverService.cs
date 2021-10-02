@@ -135,7 +135,7 @@ namespace AnalyzerCore.Services
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
 
-            _log.Debug(JsonSerializer.Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
+            // _log.Debug(JsonSerializer.Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
