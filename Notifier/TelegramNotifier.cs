@@ -113,12 +113,19 @@ namespace AnalyzerCore.Notifier
                         $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
                         $"  version: {version}"
                     );
-                    await _bot.EditMessageTextAsync(
-                        _chatId, 
-                        t.TelegramMsgId, 
-                        msg, 
-                        ParseMode.Html,
-                        disableWebPagePreview: true);
+                    try
+                    {
+                        await _bot.EditMessageTextAsync(
+                            _chatId,
+                            t.TelegramMsgId,
+                            msg,
+                            ParseMode.Html,
+                            disableWebPagePreview: true);
+                    }
+                    catch (Telegram.Bot.Exceptions.MessageIsNotModifiedException)
+                    {
+                        _log.Debug("no updates for token {token}", t.TokenId);
+                    }
                 }
             }
         }
