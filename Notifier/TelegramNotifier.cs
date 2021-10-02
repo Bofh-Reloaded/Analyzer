@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Polly;
 using Serilog;
 using Serilog.Context;
 using Serilog.Events;
@@ -25,7 +25,9 @@ namespace AnalyzerCore.Notifier
 
         private readonly ChatId _chatId;
 
-        private readonly List<string> _inMemorySeenToken = new List<string>();
+        private readonly List<string> _inMemorySeenToken = new();
+
+        private readonly Dictionary<string, int> _tokenTransactionsCount = new();
 
         public TelegramNotifier(string chatId, string botToken)
         {
@@ -76,12 +78,21 @@ namespace AnalyzerCore.Notifier
             }
         }
 
+        private void LoadTokenDictionaryWithTxCount(List<DbLayer.Models.TokenEntity> tokens)
+        {
+            foreach (var t in tokens)
+            {
+                _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
+            }
+        }
+
         public async Task UpdateMissingTokensAsync(string baseUri, string version)
         {
             await using var context = new TokenDbContext();
             // taking tokens notified but not yet deleted
             var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false && t.TxCount > 10);
             var tokenToBeUpdated = query.ToList();
+            // LoadTokenDictionaryWithTxCount(tokenToBeUpdated);
             _log.Debug("going to update {tokenNumber}", tokenToBeUpdated.Count.ToString());
             foreach (var t in tokenToBeUpdated)
             {
@@ -97,35 +108,50 @@ namespace AnalyzerCore.Notifier
                 const string star = "\U00002B50";
                 var transactionHash = t.TransactionHashes.FirstOrDefault()?.Hash;
                 var pools = t.Pools.ToList();
-                if (transactionHash != null)
+                if (transactionHash == null) continue;
+                var msg = string.Join(
+                    Environment.NewLine,
+                    $"<b>{t.TokenSymbol} [<a href='{baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
+                    $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
+                    $"  token address: {t.TokenAddress}",
+                    $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
+                    $"  totalTxCount: {t.TxCount.ToString()}",
+                    $"  lastTxSeen: <a href='{baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
+                    $"  from: <a href='{baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
+                    $"  to: <a href='{baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
+                    $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                    $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                    $"  version: {version}"
+                );
+                var policy = Policy
+                    .Handle<Telegram.Bot.Exceptions.MessageIsNotModifiedException>()
+                    .Or<System.Net.Http.HttpRequestException>()
+                    .WaitAndRetryAsync(5, retryAttempt =>
+                        TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                if (_tokenTransactionsCount.ContainsKey(t.TokenAddress) &&
+                    _tokenTransactionsCount[t.TokenAddress] == t.TxCount) continue; 
+                _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
+                await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
+                    _chatId,
+                    t.TelegramMsgId,
+                    msg,
+                    ParseMode.Html,
+                    disableWebPagePreview: true)
+                );
+                        
+                try
                 {
-                    var msg = string.Join(
-                        Environment.NewLine,
-                        $"<b>{t.TokenSymbol} [<a href='{baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
-                        $"  token address: {t.TokenAddress}",
-                        $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
-                        $"  totalTxCount: {t.TxCount.ToString()}",
-                        $"  lastTxSeen: <a href='{baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
-                        $"  from: <a href='{baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
-                        $"  to: <a href='{baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                        $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        $"  version: {version}"
-                    );
-                    try
-                    {
-                        await _bot.EditMessageTextAsync(
-                            _chatId,
-                            t.TelegramMsgId,
-                            msg,
-                            ParseMode.Html,
-                            disableWebPagePreview: true);
-                    }
-                    catch (Telegram.Bot.Exceptions.MessageIsNotModifiedException)
-                    {
-                        _log.Debug("no updates for token {token}", t.TokenId);
-                    }
+                    _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
+                    await _bot.EditMessageTextAsync(
+                        _chatId,
+                        t.TelegramMsgId,
+                        msg,
+                        ParseMode.Html,
+                        disableWebPagePreview: true);
+                }
+                catch (Telegram.Bot.Exceptions.MessageIsNotModifiedException)
+                {
+                    _log.Debug("no updates for token {token}", t.TokenId);
                 }
             }
         }
