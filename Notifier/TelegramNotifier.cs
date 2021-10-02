@@ -131,6 +131,7 @@ namespace AnalyzerCore.Notifier
                     _tokenTransactionsCount[t.TokenAddress] == t.TxCount)
                 {
                     _log.Warning("no updates on token: {tokenSymbol}", t.TokenSymbol);
+                    continue;
                 } 
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
