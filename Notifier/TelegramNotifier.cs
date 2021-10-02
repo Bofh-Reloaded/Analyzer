@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -15,7 +14,6 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static System.String;
-using File = Telegram.Bot.Types.File;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Message = AnalyzerCore.Models.Message;
 
@@ -33,7 +31,7 @@ namespace AnalyzerCore.Notifier
 
         private Dictionary<string, int> _tokenTransactionsCount = new();
 
-        public readonly string _tmpFileName = "tokensCont.json";
+        private const string TASK_TMP_FILE_NAME = "tokensCont.json";
 
         public TelegramNotifier(string chatId, string botToken)
         {
@@ -52,12 +50,7 @@ namespace AnalyzerCore.Notifier
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
 
-            // Initialize file state
-            // using var context = new TokenDbContext();
-            // taking tokens notified but not yet deleted
-            // var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false);
-            // var tokenToBeUpdated = query.ToList();
-            // LoadTokenDictionaryWithTxCount(tokenToBeUpdated);
+            LoadTokenDictionaryWithTxCount();
         }
 
         public async void SendMessage(string text)
@@ -91,9 +84,9 @@ namespace AnalyzerCore.Notifier
             }
         }
 
-        private void LoadTokenDictionaryWithTxCount(List<DbLayer.Models.TokenEntity> tokens)
+        private void LoadTokenDictionaryWithTxCount()
         {
-            var f = System.IO.File.ReadAllText(_tmpFileName);
+            var f = System.IO.File.ReadAllText(TASK_TMP_FILE_NAME);
             _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
         }
 
@@ -147,7 +140,7 @@ namespace AnalyzerCore.Notifier
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
                     new JsonSerializerOptions() { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(_tmpFileName, jsonString);
+                await System.IO.File.WriteAllTextAsync(TASK_TMP_FILE_NAME, jsonString);
                 await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
                     _chatId,
                     t.TelegramMsgId,
