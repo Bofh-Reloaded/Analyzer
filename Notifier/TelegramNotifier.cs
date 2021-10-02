@@ -124,8 +124,7 @@ namespace AnalyzerCore.Notifier
                     $"  version: {version}"
                 );
                 var policy = Policy
-                    .Handle<Telegram.Bot.Exceptions.MessageIsNotModifiedException>()
-                    .Or<System.Net.Http.HttpRequestException>()
+                    .Handle<Exception>()
                     .WaitAndRetryAsync(5, retryAttempt =>
                         TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
                 if (_tokenTransactionsCount.ContainsKey(t.TokenAddress) &&
