@@ -80,7 +80,7 @@ namespace AnalyzerCore.Notifier
         {
             await using var context = new TokenDbContext();
             // taking tokens notified but not yet deleted
-            var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false);
+            var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false && t.TxCount > 10);
             var tokenToBeUpdated = query.ToList();
             _log.Debug("going to update {tokenNumber}", tokenToBeUpdated.Count.ToString());
             foreach (var t in tokenToBeUpdated)
