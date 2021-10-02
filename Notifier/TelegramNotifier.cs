@@ -129,8 +129,8 @@ namespace AnalyzerCore.Notifier
                     $"  lastTxSeen: <a href='{baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
                     $"  from: <a href='{baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
                     $"  to: <a href='{baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                    $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                    $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                    $"  pools: [{Environment.NewLine}{Join(Environment.NewLine, pools.Select(p => $"    <a href='{baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
+                    $"  exchanges: [{Environment.NewLine}{Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
                     $"  version: {version}"
                 );
                 var policy = Policy

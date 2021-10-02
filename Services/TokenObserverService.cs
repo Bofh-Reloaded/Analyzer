@@ -119,11 +119,14 @@ namespace AnalyzerCore.Services
             return result;
         }
 
-        private IEnumerable<JToken>? GetPoolUsedFromTransaction(Transaction enT)
+        private IEnumerable<JToken> GetPoolUsedFromTransaction(Transaction enT)
         {
             var policy = Policy.Handle<Exception>()
                 .Retry(3, onRetry: (exception, retryCount, context) =>
                 {
+                    _log.Error(exception.Message);
+                    _log.Error(retryCount.ToString());
+                    _log.Error(context.ToString());
                     _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
                 });
             var result = policy.Execute(
