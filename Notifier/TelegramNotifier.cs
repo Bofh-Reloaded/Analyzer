@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
 using Newtonsoft.Json;
@@ -13,6 +15,8 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static System.String;
+using File = Telegram.Bot.Types.File;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 using Message = AnalyzerCore.Models.Message;
 
 namespace AnalyzerCore.Notifier
@@ -27,7 +31,9 @@ namespace AnalyzerCore.Notifier
 
         private readonly List<string> _inMemorySeenToken = new();
 
-        private readonly Dictionary<string, int> _tokenTransactionsCount = new();
+        private Dictionary<string, int> _tokenTransactionsCount = new();
+
+        public readonly string _tmpFileName = "tokensCont.json";
 
         public TelegramNotifier(string chatId, string botToken)
         {
@@ -45,6 +51,13 @@ namespace AnalyzerCore.Notifier
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
+
+            // Initialize file state
+            // using var context = new TokenDbContext();
+            // taking tokens notified but not yet deleted
+            // var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false);
+            // var tokenToBeUpdated = query.ToList();
+            // LoadTokenDictionaryWithTxCount(tokenToBeUpdated);
         }
 
         public async void SendMessage(string text)
@@ -80,19 +93,16 @@ namespace AnalyzerCore.Notifier
 
         private void LoadTokenDictionaryWithTxCount(List<DbLayer.Models.TokenEntity> tokens)
         {
-            foreach (var t in tokens)
-            {
-                _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
-            }
+            var f = System.IO.File.ReadAllText(_tmpFileName);
+            _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
         }
 
         public async Task UpdateMissingTokensAsync(string baseUri, string version)
         {
             await using var context = new TokenDbContext();
             // taking tokens notified but not yet deleted
-            var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false && t.TxCount > 10);
+            var query = context.Tokens.Where(t => t.Notified == true && t.Deleted == false);
             var tokenToBeUpdated = query.ToList();
-            // LoadTokenDictionaryWithTxCount(tokenToBeUpdated);
             _log.Debug("going to update {tokenNumber}", tokenToBeUpdated.Count.ToString());
             foreach (var t in tokenToBeUpdated)
             {
@@ -132,8 +142,12 @@ namespace AnalyzerCore.Notifier
                 {
                     _log.Warning("no updates on token: {tokenSymbol}", t.TokenSymbol);
                     continue;
-                } 
+                }
+
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
+                var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
+                    new JsonSerializerOptions() { WriteIndented = true });
+                await System.IO.File.WriteAllTextAsync(_tmpFileName, jsonString);
                 await policy.ExecuteAsync(async () => await _bot.EditMessageTextAsync(
                     _chatId,
                     t.TelegramMsgId,
@@ -141,7 +155,7 @@ namespace AnalyzerCore.Notifier
                     ParseMode.Html,
                     disableWebPagePreview: true)
                 );
-                        
+
                 try
                 {
                     _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
@@ -220,6 +234,7 @@ namespace AnalyzerCore.Notifier
             var resp = await _bot.EditMessageTextAsync(_chatId, msgId, text);
             return resp;
         }
+
         public async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
         {
             try
