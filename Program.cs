@@ -1,11 +1,14 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using CommandLine;
 using AnalyzerCore.Models;
 using AnalyzerCore.Services;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using Serilog;
 using Serilog.Events;
 using Serilog.Exceptions;
@@ -15,9 +18,12 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
-        private const string TASK_VERSION = "0.9.4-db-persistance-websocket";
+        private const string TaskVersion = "0.9.4-db-persistance-websocket";
 
         private static string _configFileName;
+        private static bool _statsEnabled = false;
+        private static bool _tokenAnalyzerEnabled = false;
+        private static bool _porcoDioEnabled = false;
 
         private static void Main(string[] args)
         {
@@ -33,12 +39,17 @@ namespace AnalyzerCore
                 .CreateLogger();
 
             Parser.Default.ParseArguments<Options>(args)
-                .WithParsed<Options>(o =>
+                .WithParsed(o =>
                 {
                     if (o.Config.Length > 0)
                     {
                         _configFileName = o.Config;
                     }
+
+                    _statsEnabled = o.Stats;
+                    _tokenAnalyzerEnabled = o.Token;
+                    _porcoDioEnabled = o.Porco;
+
                 });
 
             CreateHostBuilder(args).Build().Run();
@@ -59,26 +70,26 @@ namespace AnalyzerCore
                     var section = configuration.GetSection(nameof(AnalyzerConfig));
                     var analyzerConfig = section.Get<AnalyzerConfig>();
 
-                    var plyDataHandler =
+                    var dataHandler =
                         new DataCollectorService.ChainDataHandler();
-                    if (analyzerConfig.ServicesConfig.AnalyzerService.Enabled)
+                    if (_statsEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new AnalyzerService(analyzerConfig, plyDataHandler, TASK_VERSION)
+                            _ => new AnalyzerService(analyzerConfig, dataHandler, TaskVersion)
                         );
                     }
 
-                    if (analyzerConfig.ServicesConfig.TokenAnalyzer.Enabled)
+                    if (_tokenAnalyzerEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(analyzerConfig, TASK_VERSION)
+                            _ => new TokenObserverService(analyzerConfig, TaskVersion)
                         );
                     }
 
-                    if (analyzerConfig.ServicesConfig.DataCollector.Enabled)
+                    if (_statsEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(analyzerConfig, plyDataHandler, TASK_VERSION)
+                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion)
                         );
                     }
                 });
@@ -88,6 +99,15 @@ namespace AnalyzerCore
         {
             [Option('c', "config", Required = true, HelpText = "config file to load")]
             public string Config { get; set; }
+            
+            [Option('s', "stats", Required=false, HelpText = "Start Stats Service")]
+            public bool Stats { get; set; }
+            
+            [Option('t', "token", Required = false, HelpText = "Start Token Analyzer Service")]
+            public bool Token { get; set; }
+            
+            [Option('k', "porco", Required = false, HelpText = "Porcodidio")]
+            public bool Porco { get; set; }
         }
     }
 }
