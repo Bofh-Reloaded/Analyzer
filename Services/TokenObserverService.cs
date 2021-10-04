@@ -1,10 +1,10 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
@@ -24,6 +24,7 @@ using Polly;
 using Serilog.Context;
 using Serilog.Events;
 using Serilog.Exceptions;
+using static System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
@@ -47,7 +48,7 @@ namespace AnalyzerCore.Services
         private readonly Web3 _web3;
 
         // Initialize configuration accessor
-        private IConfigurationRoot? _configuration;
+        private IConfigurationRoot _configuration;
 
         private TokenListConfig _tokenList = null!;
 
@@ -133,7 +134,7 @@ namespace AnalyzerCore.Services
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
 
-            // _log.Debug(JsonSerializer.Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
+            _log.Debug("{Message}",Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
@@ -382,7 +383,7 @@ namespace AnalyzerCore.Services
 
             // Retrieve Transactions inside the block
             _log.Information("getting transactions inside block");
-            BlockWithTransactions? blockTransactions;
+            BlockWithTransactions blockTransactions;
             try
             {
                 blockTransactions = await
@@ -420,7 +421,7 @@ namespace AnalyzerCore.Services
                 _log.Debug("Total transaction to analyze: {TransactionsCount}", enTransactions.Count.ToString());
                 foreach (var t in enTransactions)
                 {
-                    IEnumerable<JToken>? poolsUsed = null;
+                    IEnumerable<JToken> poolsUsed = null;
                     while (poolsUsed == null)
                     {
                         try
