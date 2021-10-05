@@ -133,7 +133,7 @@ namespace AnalyzerCore.Services
                     }
                     catch (Exception ex)
                     {
-                        _log.Error(ex.ToString());
+                        _log.Error("{Error}", ex.ToString());
                     }
                 });
 
@@ -144,7 +144,7 @@ namespace AnalyzerCore.Services
                 // data will be received on a background thread
                 await subscription.SubscribeAsync(filterTransfers);
 
-                while (subscription.SubscriptionState == SubscriptionState.Subscribing || subscription.SubscriptionState == SubscriptionState.Subscribed)
+                while (subscription.SubscriptionState is SubscriptionState.Subscribing or SubscriptionState.Subscribed)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
                 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -10,7 +11,6 @@ using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
 using Nethereum.JsonRpc.Client.Streaming;
@@ -21,7 +21,9 @@ using Nethereum.Web3;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Polly;
+using Serilog;
 using Serilog.Context;
+using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
 using static System.Text.Json.JsonSerializer;
@@ -38,7 +40,7 @@ namespace AnalyzerCore.Services
         private readonly AnalyzerConfig _config;
         private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
-        private readonly Serilog.Core.Logger _log;
+        private readonly Logger _log;
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
 
@@ -100,7 +102,14 @@ namespace AnalyzerCore.Services
                 }
 
                 token.Deleted = true;
-                await context.SaveChangesAsync();
+                var policy = Policy.Handle<Exception>()
+                    .WaitAndRetryAsync(new[]
+                    {
+                        TimeSpan.FromSeconds(2),
+                        TimeSpan.FromSeconds(4),
+                        TimeSpan.FromSeconds(6)
+                    })
+                    .ExecuteAsync(async () => await context.SaveChangesAsync());
             }
         }
 
@@ -126,15 +135,22 @@ namespace AnalyzerCore.Services
         private IEnumerable<JToken> GetPoolUsedFromTransaction(Transaction enT)
         {
             var policy = Policy.Handle<Exception>()
-                .Retry(3, onRetry: (_, _) =>
-                {
-                    _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
-                });
+                .Retry(3,
+                    onRetry: (_, _) =>
+                    {
+                        _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
+                    });
             var result = policy.Execute(
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
 
-            _log.Debug("{Message}",Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
+            if (result.Result.Logs.Count <= 0)
+            {
+                _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
+                throw new DataException();
+            }
+
+            _log.Debug("{Message}", Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
@@ -428,7 +444,7 @@ namespace AnalyzerCore.Services
                         {
                             poolsUsed = GetPoolUsedFromTransaction(t);
                         }
-                        catch (AggregateException)
+                        catch (Exception)
                         {
                             poolsUsed = null;
                         }
