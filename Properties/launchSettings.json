@@ -1,10 +1,8 @@
 {
   "profiles": {
     "AnalyzerCore": {
-      "commandName": "Project"
-    },
-    "Docker": {
-      "commandName": "Docker"
+      "commandName": "Project",
+      "commandLineArgs": "--porco --config appSettings.bsc.json"
     }
   }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
+using System.Threading.Tasks;
 using CommandLine;
 using AnalyzerCore.Models;
 using AnalyzerCore.Services;
@@ -90,6 +91,13 @@ namespace AnalyzerCore
                     {
                         services.AddScoped<IHostedService>(
                             _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion)
+                        );
+                    }
+
+                    if (_porcoDioEnabled)
+                    {
+                        services.AddScoped<IHostedService>(
+                            _ => new PorcoDioService(analyzerConfig, TaskVersion)
                         );
                     }
                 });
