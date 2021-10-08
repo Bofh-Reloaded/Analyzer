@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
         {
             _chainName = config.ChainName;
             _telegramNotifier = new TelegramNotifier(config.ServicesConfig.TokenAnalyzer.ChatId,
-                config.ServicesConfig.TokenAnalyzer.BotToken);
+                config.ServicesConfig.TokenAnalyzer.BotToken, config);
             _tokenAddressToCompareWith = config.Enemies;
             _baseUri = config.ServicesConfig.TokenAnalyzer.BaseUri;
             _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort.ToString()}");

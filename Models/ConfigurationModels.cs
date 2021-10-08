@@ -51,7 +51,7 @@ namespace AnalyzerCore.Models
         public int RpcPort { get; set; }
         public int WssPort { get; set; }
         public List<string> Enemies { get; set; }
-        public string Address { get; set; }
+        public List<string> Wallets { get; set; }
         public ServicesConfig ServicesConfig { get; set; }
     }
 

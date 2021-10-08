@@ -1,15 +1,11 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
-using System.Threading.Tasks;
 using CommandLine;
 using AnalyzerCore.Models;
 using AnalyzerCore.Services;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json;
 using Serilog;
 using Serilog.Events;
 using Serilog.Exceptions;
@@ -19,7 +15,7 @@ namespace AnalyzerCore
 {
     internal static class Program
     {
-        private const string TaskVersion = "0.9.4-db-persistance-websocket";
+        private const string TaskVersion = "0.9.5-db-persistance-websocket";
 
         private static string _configFileName;
         private static bool _statsEnabled = false;

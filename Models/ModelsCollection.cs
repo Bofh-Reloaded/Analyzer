@@ -47,7 +47,7 @@ namespace AnalyzerCore.Models
         public List<AddressStats> Addresses { get; set; }
         public int Tps { get; set; }
         public int TotalTrx { get; internal set; }
-        public string OurAddress { get; internal set; }
+        public string Address { get; internal set; }
     }
 
     public class Token

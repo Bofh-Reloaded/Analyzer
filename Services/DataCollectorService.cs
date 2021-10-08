@@ -54,32 +54,32 @@ namespace AnalyzerCore.Services
             LogContext.PushProperty("SourceContext", $"{_chainName}");
             
             // Registering Web3 client endpoint
-            _log.Information($"DataCollectorService Initialized for chain: {config.ChainName}");
+            _log.Information("DataCollectorService Initialized for chain: {ChainName}", config.ChainName);
             try
             {
-                _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort}");
+                _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort.ToString()}");
             }
             catch
             {
-                _log.Error($"Cannot connect to RPC: {config.RpcEndpoints.First()}.");
+                _log.Error("Cannot connect to RPC: {RpcEndPoint}", config.RpcEndpoints.First());
             }
 
             _addresses = config.Enemies;
-            _addresses.Add(config.Address);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             stoppingToken.Register(() =>
-                _log.Information($"DataCollectorService background task is stopping for chain: {_chainName}"));
+                _log.Information("DataCollectorService background task is stopping for chain: {ChainName}",
+                    _chainName));
             while (!stoppingToken.IsCancellationRequested)
             {
-                _log.Information($"Starting a new cycle for chain: {_chainName}");
+                _log.Information("Starting a new cycle for chain: {ChainName}", _chainName);
                 ChainData chainData;
                 try
                 {
                     chainData = new ChainData(_web3, _chainName, _maxParallelism, _addresses);
-                    _log.Information($"Retrieved currentBlock: {chainData.CurrentBlock}");
+                    _log.Information("Retrieved currentBlock: {CurrentBlock}", chainData.CurrentBlock);
                 }
                 catch (Exception)
                 {
@@ -94,19 +94,21 @@ namespace AnalyzerCore.Services
                 {
                     if (_oldBlock.Value == currentBlock.Value)
                     {
-                        _log.Error("We are retrieving the same block, change RPC. Stopping Service.");
+                        _log.Error("We are retrieving the same block, change RPC. Stopping Service");
                         await StopAsync(stoppingToken);
                     }
                 }
                 _oldBlock = currentBlock;
-                _log.Information($"Processing Blocks: {TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE.ToString()}");
+                _log.Information("Processing Blocks: {Block}", TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE.ToString());
                 var startBlock = new HexBigInteger(currentBlock.Value - TASK_NUMBER_OF_BLOCKS_TO_RETRIEVE);
-                _log.Information($"From Block: {startBlock.Value.ToString()} To Block: {currentBlock.Value.ToString()}");
+                _log.Information("From Block: {StartBlock} To Block: {EndBlock}",
+                    startBlock.Value.ToString(),
+                    currentBlock.Value.ToString());
                 await Task.Run(() => 
                     chainData.GetBlocks(
                         (long) startBlock.Value, (long) currentBlock.Value, stoppingToken), 
                     stoppingToken);
-                _log.Information($"Total Trx Retrieved: {chainData.Transactions.Count.ToString()}");
+                _log.Information("Total Trx Retrieved: {TransactionCount}", chainData.Transactions.Count.ToString());
                 _chainDataHandler.DataChange(chainData);
                 await Task.Delay(TASK_TASK_DELAY_MS, stoppingToken);
             }

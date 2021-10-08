@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
+using AnalyzerCore.Models;
 using Newtonsoft.Json;
 using Polly;
 using Serilog;
@@ -30,13 +31,15 @@ namespace AnalyzerCore.Notifier
         private readonly List<string> _inMemorySeenToken = new();
 
         private Dictionary<string, int> _tokenTransactionsCount = new();
+        private readonly AnalyzerConfig _config;
 
         private const string TaskTmpFileName = "tokensCont.json";
 
-        public TelegramNotifier(string chatId, string botToken)
+        public TelegramNotifier(string chatId, string botToken, AnalyzerConfig config)
         {
             _chatId = chatId;
             _bot = new TelegramBotClient(botToken);
+            _config = config;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -50,7 +53,6 @@ namespace AnalyzerCore.Notifier
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
             LoadTokenDictionaryWithTxCount();
-
         }
 
         public async void SendMessage(string text)
@@ -142,6 +144,7 @@ namespace AnalyzerCore.Notifier
                 {
                     continue;
                 }
+
                 _log.Warning("update token: {tokenSymbol}", t.TokenSymbol);
 
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
@@ -249,6 +252,55 @@ namespace AnalyzerCore.Notifier
             }
         }
 
+        public async void SendOurStatsRecap(Message message)
+        {
+            _log.Information("SendOurStatsRecap");
+            var m = new List<string> { message.Timestamp };
+            foreach (var a in message.Addresses)
+            {
+                _log.Debug("Processing our address: {Wallet}", a.Address);
+                m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
+                var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
+                if (totalTxInMaxBlockRange.First().TotalTransactionsPerBlockRange == 0)
+                {
+                    m.Add("  No Activity from this address");
+                    continue;
+                }
+
+                foreach (var s in a.BlockRanges)
+                {
+                    try
+                    {
+                        m.Add(
+                            $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
+                        var w = s.T0TrxSucceded.Count > 0 ? 100 * s.T0TrxSucceded.Count / s.T0Trx.Count : 0;
+                        m.Add(
+                            $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                        w = s.T1TrxSucceded.Count > 0 ? 100 * s.T1TrxSucceded.Count / s.T1Trx.Count : 0;
+                        m.Add(
+                            $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                        w = s.T2TrxSucceded.Count > 0 ? 100 * s.T2TrxSucceded.Count / s.T2Trx.Count : 0;
+                        m.Add(
+                            $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                        w = s.ContPSucceded.Count > 0 ? 100 * s.ContPSucceded.Count / s.ContP.Count : 0;
+                        m.Add(
+                            $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                    }
+                    catch (DivideByZeroException e)
+                    {
+                        Console.WriteLine(e);
+                        throw;
+                    }
+                }
+
+                var _ = await _bot.SendTextMessageAsync(
+                    _chatId,
+                    Join(Environment.NewLine, m.ToArray()),
+                    ParseMode.Html
+                );
+            }
+        }
+
         public async void SendStatsRecap(Message message)
         {
             var m = new List<string> { message.Timestamp };
@@ -281,29 +333,9 @@ namespace AnalyzerCore.Notifier
                 foreach (var s in a.BlockRanges)
                     try
                     {
-                        if (string.Equals(a.Address, message.OurAddress, StringComparison.CurrentCultureIgnoreCase))
-                        {
-                            m.Add(
-                                $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
-                            var w = s.T0TrxSucceded.Count > 0 ? 100 * s.T0TrxSucceded.Count / s.T0Trx.Count : 0;
-                            m.Add(
-                                $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
-                            w = s.T1TrxSucceded.Count > 0 ? 100 * s.T1TrxSucceded.Count / s.T1Trx.Count : 0;
-                            m.Add(
-                                $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
-                            w = s.T2TrxSucceded.Count > 0 ? 100 * s.T2TrxSucceded.Count / s.T2Trx.Count : 0;
-                            m.Add(
-                                $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
-                            w = s.ContPSucceded.Count > 0 ? 100 * s.ContPSucceded.Count / s.ContP.Count : 0;
-                            m.Add(
-                                $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {w.ToString()}%");
-                        }
-                        else
-                        {
-                            if (s.TotalTransactionsPerBlockRange == 0) continue;
-                            m.Add(
-                                $" B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}");
-                        }
+                        if (s.TotalTransactionsPerBlockRange == 0) continue;
+                        m.Add(
+                            $" B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}");
                     }
                     catch (DivideByZeroException e)
                     {
@@ -312,8 +344,6 @@ namespace AnalyzerCore.Notifier
                     }
             }
 
-            m.Add(
-                $"\U0001F4CATotal TRX on last 500B: {message.TotalTrx.ToString()}, Average TPS: {message.Tps}\U0001F4CA");
             var _ = await _bot.SendTextMessageAsync(
                 _chatId,
                 Join(Environment.NewLine, m.ToArray()),
