@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
+using Org.BouncyCastle.Math.EC;
 using Serilog;
 using Serilog.Context;
 using Serilog.Core;
@@ -34,13 +35,17 @@ namespace AnalyzerCore.Services
 
         private readonly Web3 _web3;
         private HexBigInteger _oldBlock = new HexBigInteger(new BigInteger(0));
+        private readonly AnalyzerConfig _config;
+        private readonly LogEventLevel _logEventLevel;
 
-        public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler, string version)
+        public DataCollectorService(AnalyzerConfig config, ChainDataHandler chainDataHandler, string version, LogEventLevel logEventLevel)
         {
             _chainName = config.ChainName;
             _maxParallelism = config.ServicesConfig.MaxParallelism;
             _chainDataHandler = chainDataHandler;
             _version = version;
+            _config = config;
+            _logEventLevel = logEventLevel;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -48,6 +53,7 @@ namespace AnalyzerCore.Services
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
+                    logEventLevel,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
@@ -78,7 +84,12 @@ namespace AnalyzerCore.Services
                 ChainData chainData;
                 try
                 {
-                    chainData = new ChainData(_web3, _chainName, _maxParallelism, _addresses);
+                    chainData = new ChainData(_web3,
+                        _chainName,
+                        _maxParallelism,
+                        _addresses,
+                        _config.Wallets,
+                        _logEventLevel);
                     _log.Information("Retrieved currentBlock: {CurrentBlock}", chainData.CurrentBlock);
                 }
                 catch (Exception)

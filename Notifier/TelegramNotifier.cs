@@ -33,7 +33,7 @@ namespace AnalyzerCore.Notifier
         private Dictionary<string, int> _tokenTransactionsCount = new();
         private readonly AnalyzerConfig _config;
 
-        private const string TaskTmpFileName = "tokensCont.json";
+        private const string TASK_TASK_TMP_FILE_NAME = "tokensCont.json";
 
         public TelegramNotifier(string chatId, string botToken, AnalyzerConfig config)
         {
@@ -47,7 +47,7 @@ namespace AnalyzerCore.Notifier
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
-                    restrictedToMinimumLevel: LogEventLevel.Information,
+                    restrictedToMinimumLevel: LogEventLevel.Debug,
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
@@ -90,12 +90,12 @@ namespace AnalyzerCore.Notifier
         {
             try
             {
-                var f = System.IO.File.ReadAllText(TaskTmpFileName);
+                var f = System.IO.File.ReadAllText(TASK_TASK_TMP_FILE_NAME);
                 _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
             }
             catch (Exception)
             {
-                _log.Error("file {Filename} not found, will be created later", TaskTmpFileName);
+                _log.Error("file {Filename} not found, will be created later", TASK_TASK_TMP_FILE_NAME);
             }
         }
 
@@ -121,10 +121,10 @@ namespace AnalyzerCore.Notifier
                 var transactionHash = t.TransactionHashes.FirstOrDefault()?.Hash;
                 var pools = t.Pools.ToList();
                 if (transactionHash == null) continue;
-                var msg = string.Join(
+                var msg = Join(
                     Environment.NewLine,
                     $"<b>{t.TokenSymbol} [<a href='{baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                    $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
+                    $"{Concat(Enumerable.Repeat(star, t.TxCount))}",
                     $"  token address: {t.TokenAddress}",
                     $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                     $"  totalTxCount: {t.TxCount.ToString()}",
@@ -150,7 +150,7 @@ namespace AnalyzerCore.Notifier
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
                     new JsonSerializerOptions() { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(TaskTmpFileName, jsonString);
+                await System.IO.File.WriteAllTextAsync(TASK_TASK_TMP_FILE_NAME, jsonString);
 
                 try
                 {
@@ -158,14 +158,13 @@ namespace AnalyzerCore.Notifier
                         _chatId,
                         t.TelegramMsgId,
                         msg,
-                        ParseMode.Html,
+                        parseMode: ParseMode.Html,
                         disableWebPagePreview: true)
                     );
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine(e);
-                    continue;
                 }
             }
         }
@@ -198,10 +197,10 @@ namespace AnalyzerCore.Notifier
                 var pools = t.Pools.ToList();
                 if (transactionHash != null)
                 {
-                    var msg = string.Join(
+                    var msg = Join(
                         Environment.NewLine,
                         $"<b>{t.TokenSymbol} [<a href='{baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
+                        $"{Concat(Enumerable.Repeat(star, t.TxCount))}",
                         $"  token address: {t.TokenAddress}",
                         $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
                         $"  totalTxCount: {t.TxCount.ToString()}",
@@ -255,9 +254,9 @@ namespace AnalyzerCore.Notifier
         public async void SendOurStatsRecap(Message message)
         {
             _log.Information("SendOurStatsRecap");
-            var m = new List<string> { message.Timestamp };
             foreach (var a in message.Addresses)
             {
+                var m = new List<string> { message.Timestamp };
                 _log.Debug("Processing our address: {Wallet}", a.Address);
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);

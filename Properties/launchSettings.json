@@ -2,7 +2,7 @@
   "profiles": {
     "AnalyzerCore": {
       "commandName": "Project",
-      "commandLineArgs": "--porco --config appSettings.bsc.json"
+      "commandLineArgs": "--stats --config appSettings.bsc.json"
     }
   }
 }

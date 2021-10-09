@@ -21,12 +21,13 @@ namespace AnalyzerCore
         private static bool _statsEnabled = false;
         private static bool _tokenAnalyzerEnabled = false;
         private static bool _porcoDioEnabled = false;
+        private static readonly LogEventLevel _logEventLevel = LogEventLevel.Information; 
 
         private static void Main(string[] args)
         {
             var log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
@@ -86,7 +87,7 @@ namespace AnalyzerCore
                     if (_statsEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion)
+                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion, _logEventLevel)
                         );
                     }
 

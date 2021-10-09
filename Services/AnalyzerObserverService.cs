@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
 using Nethereum.RPC.Eth.DTOs;
@@ -14,14 +13,13 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
-using SQLitePCL;
 
 namespace AnalyzerCore.Services
 {
     public sealed class AnalyzerService : BackgroundService, IObserver<DataCollectorService.ChainData>
     {
         // Define the delay between one cycle and another
-        private const int TaskTaskDelayMs = 360000;
+        private const int TASK_TASK_TASK_DELAY_MS = 360000;
 
         // Array of block to analyze
         private static readonly List<int> NumbersOfBlocksToAnalyze = new() { 25, 100, 500 };
@@ -44,6 +42,7 @@ namespace AnalyzerCore.Services
         private readonly TelegramNotifier _telegramNotifier;
         private readonly string _version;
         private IDisposable _cancellation;
+        private DataCollectorService.ChainData _chainData;
 
         public AnalyzerService(AnalyzerConfig config, DataCollectorService.ChainDataHandler chainDataHandler,
             string version)
@@ -59,15 +58,17 @@ namespace AnalyzerCore.Services
             _ourAddresses = config.Wallets;
             _chainDataHandler = chainDataHandler;
             _version = version;
+            
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
                 .Enrich.FromLogContext()
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Console(
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
-                                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
+                    LogEventLevel.Debug,
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
+                    "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"{_chainName}");
 
@@ -125,55 +126,34 @@ namespace AnalyzerCore.Services
 
             _log.Information("Total trx: {NumberOfTransaction}", chainData.Transactions.Count.ToString());
 
-            var msg = new Message
-            {
-                Addresses = new List<AddressStats>(),
-                Timestamp =
-                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 To Current Block: {chainData.CurrentBlock}</b>"
-            };
-
-            /* Checking succeded transactions */
-            foreach (var address in _addresses)
-            {
-                var addsStats = new AddressStats { Address = address, BlockRanges = new List<BlockRangeStats>() };
-                // Init Transactions Data
-                chainData.GetAddressTransactions(address);
-
-                _log.Information("Evaluating Address:{Address} with trx amount: {NumberOfTransactions}",
-                    address,
-                    chainData.Addresses[address]
-                        .Transactions.Count.ToString());
-
-                foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
-                {
-                    addsStats.BlockRanges.Add(await CreateBlockRange(numberOfBlocks, chainData, address));
-                }
-
-                msg.Addresses.Add(addsStats);
-            }
-
-            msg.TotalTrx = chainData.Transactions.Count;
-            msg.Tps = chainData.Transactions.Count / _blockDurationTime;
-
-            _telegramNotifier.SendStatsRecap(msg);
+            // Propagating _chainData
+            _chainData = chainData;
             
-            var msg2 = new Message
+            // Build and delivery stat message
+            // await ReportCompetitor();
+            var msg = await CreateOurAddressesReport();
+            _telegramNotifier.SendOurStatsRecap(msg);
+        }
+
+        private async Task<Message> CreateOurAddressesReport()
+        {
+            var telegramMessage = new Message
             {
                 Addresses = new List<AddressStats>(),
                 Timestamp =
-                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 To Current Block: {chainData.CurrentBlock}</b>"
+                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 To Current Block: {_chainData.CurrentBlock}</b>"
             };
             _log.Debug("OurAddresses: {OurAddresses}", JsonSerializer.Serialize(_ourAddresses));
             foreach (var wallet in _ourAddresses)
             {
                 var addsStats = new AddressStats { Address = wallet, BlockRanges = new List<BlockRangeStats>() };
-                chainData.GetAddressTransactions(wallet);
+                _chainData.GetAddressTransactions(wallet);
                 foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
                 {
                     var trxToAnalyze =
-                        chainData.Addresses[wallet]
+                        _chainData.Addresses[wallet]
                             .Transactions.Where(t =>
-                                t.Transaction.BlockNumber >= chainData.CurrentBlock.Value - numberOfBlocks)
+                                t.Transaction.BlockNumber >= _chainData.CurrentBlock.Value - numberOfBlocks)
                             .ToList();
                     var succededTrxs = trxToAnalyze
                         .Where(
@@ -215,14 +195,53 @@ namespace AnalyzerCore.Services
                             .Where(t => t.Transaction.Input.StartsWith($"0x{OpCodes.Unknown}"))
                             .ToList()
                     };
+                    _log.Debug("adding blockRangeStats for address {Address} with block range {BlockRange}",
+                        addsStats.Address,
+                        blockRangeStats.BlockRange);
                     addsStats.BlockRanges.Add(blockRangeStats);
                 }
-                msg2.Addresses.Add(addsStats);
-                
-                msg2.TotalTrx = chainData.Transactions.Count;
-                msg2.Tps = chainData.Transactions.Count / _blockDurationTime;
+
+                telegramMessage.Addresses.Add(addsStats);
+
+                telegramMessage.TotalTrx = _chainData.Transactions.Count;
+                telegramMessage.Tps = _chainData.Transactions.Count / _blockDurationTime;
             }
-            _telegramNotifier.SendOurStatsRecap(msg2);
+            return telegramMessage;
+        }
+
+        private async Task ReportCompetitor()
+        {
+            var msg = new Message
+            {
+                Addresses = new List<AddressStats>(),
+                Timestamp =
+                    $"<b>\U0001F550[{DateTime.Now.ToString(CultureInfo.InvariantCulture)}]\U0001F550 To Current Block: {_chainData.CurrentBlock}</b>"
+            };
+
+            /* Checking succeded transactions */
+            foreach (var address in _addresses)
+            {
+                var addsStats = new AddressStats { Address = address, BlockRanges = new List<BlockRangeStats>() };
+                // Init Transactions Data
+                _chainData.GetAddressTransactions(address);
+
+                _log.Information("Evaluating Address:{Address} with trx amount: {NumberOfTransactions}",
+                    address,
+                    _chainData.Addresses[address]
+                        .Transactions.Count.ToString());
+
+                foreach (var numberOfBlocks in NumbersOfBlocksToAnalyze.OrderBy(i => i))
+                {
+                    addsStats.BlockRanges.Add(await CreateBlockRange(numberOfBlocks, _chainData, address));
+                }
+
+                msg.Addresses.Add(addsStats);
+            }
+
+            msg.TotalTrx = _chainData.Transactions.Count;
+            msg.Tps = _chainData.Transactions.Count / _blockDurationTime;
+
+            _telegramNotifier.SendStatsRecap(msg);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -242,7 +261,7 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 Subscribe(_chainDataHandler);
-                await Task.Delay(TaskTaskDelayMs, stoppingToken);
+                await Task.Delay(TASK_TASK_TASK_DELAY_MS, stoppingToken);
             }
         }
 
