@@ -437,24 +437,27 @@ namespace AnalyzerCore.Services
                 foreach (var t in enTransactions)
                 {
                     IEnumerable<JToken> poolsUsed = null;
-                    while (poolsUsed == null)
-                    {
-                        try
-                        {
-                            poolsUsed = GetPoolUsedFromTransaction(t);
-                        }
-                        catch (Exception)
-                        {
-                            poolsUsed = null;
-                        }
-                    }
+                    var policy = Policy.Handle<Exception>()
+                        .WaitAndRetryAsync(new[] { 
+                            TimeSpan.FromSeconds(1), 
+                            TimeSpan.FromSeconds(2), 
+                            TimeSpan.FromSeconds(4)
+                            },
+                            onRetry: (_, _) =>
+                            {
+                                _log.Error("cannot retrieve used pool, retry");
+                            });
+                    var result = await policy.ExecuteAsync(
+                        async () => GetPoolUsedFromTransaction(t)
+                    );
+                    poolsUsed = result;
 
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
                     {
                         try
                         {
-                            List<string> tokens = await GetTokensFromPool(poolContractHandler);
+                            var tokens = await GetTokensFromPool(poolContractHandler);
                             if (tokens.Count <= 0) return;
                             var poolFactory = poolContractHandler.QueryAsync<FactoryFunction, string>();
                             poolFactory.Wait(cancellationToken);
