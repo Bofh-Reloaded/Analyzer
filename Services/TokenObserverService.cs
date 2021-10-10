@@ -25,6 +25,7 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
@@ -419,7 +420,8 @@ namespace AnalyzerCore.Services
                 foreach (var tx in blockTransactions.Transactions)
                 {
                     var r = await _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(tx.BlockHash);
-                    if (r.Failed()) continue;
+                    _log.Debug(JsonSerializer.Serialize(r));
+                    if (r == null || r.Failed()) continue;
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
                     if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr))
