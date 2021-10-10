@@ -21,7 +21,7 @@ namespace AnalyzerCore
         private static bool _statsEnabled = false;
         private static bool _tokenAnalyzerEnabled = false;
         private static bool _porcoDioEnabled = false;
-        private static readonly LogEventLevel _logEventLevel = LogEventLevel.Debug; 
+        private const LogEventLevel TASK_LOG_EVENT_LEVEL = LogEventLevel.Information;
 
         private static void Main(string[] args)
         {
@@ -87,7 +87,7 @@ namespace AnalyzerCore
                     if (_statsEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion, _logEventLevel)
+                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion, TASK_LOG_EVENT_LEVEL)
                         );
                     }
 

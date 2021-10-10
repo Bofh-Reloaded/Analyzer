@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -274,32 +275,32 @@ namespace AnalyzerCore.Notifier
                             $" \U0001F4B8<b>B: {s.BlockRange.ToString()} T: {s.TotalTransactionsPerBlockRange.ToString()} S: {s.SuccededTranstactionsPerBlockRange.ToString()} WR: {s.SuccessRate}</b>");
                         var w = Math.Round(
                             (decimal)s.T0TrxSucceded.Count > 0
-                                ? 100 * (decimal)s.T0TrxSucceded.Count / (long)s.T0Trx.Count
+                                ? 100 * (decimal)s.T0TrxSucceded.Count / s.T0Trx.Count
                                 : 0
                             , 2);
                         m.Add(
-                            $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            $"   -> Total T0 TRX: {s.T0Trx.Count.ToString()}, Succeeded: {s.T0TrxSucceded.Count.ToString()}, WR: {w.ToString(CultureInfo.InvariantCulture)}%");
                         w = Math.Round(
                             (decimal)s.T1TrxSucceded.Count > 0
-                                ? 100 * (decimal)s.T1TrxSucceded.Count / (long)s.T1Trx.Count
+                                ? 100 * (decimal)s.T1TrxSucceded.Count / s.T1Trx.Count
                                 : 0
                             , 2);
                         m.Add(
-                            $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            $"   -> Total T1 TRX: {s.T1Trx.Count.ToString()}, Succeeded: {s.T1TrxSucceded.Count.ToString()}, WR: {w.ToString(CultureInfo.InvariantCulture)}%");
                         w = Math.Round(
                             (decimal)s.T2TrxSucceded.Count > 0
-                                ? 100 * (decimal)s.T2TrxSucceded.Count / (long)s.T2Trx.Count
+                                ? 100 * (decimal)s.T2TrxSucceded.Count / s.T2Trx.Count
                                 : 0
                             , 2);
                         m.Add(
-                            $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            $"   -> Total T2 TRX: {s.T2Trx.Count.ToString()}, Succeeded: {s.T2TrxSucceded.Count.ToString()}, WR: {w.ToString(CultureInfo.InvariantCulture)}%");
                         w = Math.Round(
                             (decimal)s.ContPSucceded.Count > 0
-                                ? 100 * (decimal)s.ContPSucceded.Count / (long)s.ContP.Count
+                                ? 100 * (decimal)s.ContPSucceded.Count / s.ContP.Count
                                 : 0
                             , 2);
                         m.Add(
-                            $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {w.ToString()}%");
+                            $"   -> Total Cont TRX: {s.ContP.Count.ToString()}, Succeeded: {s.ContPSucceded.Count.ToString()}, WR: {w.ToString(CultureInfo.InvariantCulture)}%");
                     }
                     catch (DivideByZeroException e)
                     {

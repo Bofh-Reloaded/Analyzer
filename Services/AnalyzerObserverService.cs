@@ -105,16 +105,18 @@ namespace AnalyzerCore.Services
                 .ToList();
             /*_log.Debug("TRX to analyze: {NumberOfTransactionsToAnalyze}",
                 trxToAnalyze.Count().ToString());*/
-
+            var sr = new decimal();
+            if (succededTrxs.Count > 0)
+            {
+                sr = Math.Round(100 * (decimal)succededTrxs.Count / trxToAnalyze.Count, 2);
+            }
             // Calculate the success rate and construct che BlockRangeStat object
             return new BlockRangeStats
             {
                 BlockRange = numberOfBlocks,
                 SuccededTranstactionsPerBlockRange = succededTrxs.Count,
                 TotalTransactionsPerBlockRange = trxToAnalyze.Count,
-                SuccessRate = succededTrxs.Count > 0
-                    ? $"{100 * succededTrxs.Count / trxToAnalyze.Count}%"
-                    : "0"
+                SuccessRate = $"{sr}%"
             };
         }
 
@@ -242,6 +244,7 @@ namespace AnalyzerCore.Services
             msg.TotalTrx = _chainData.Transactions.Count;
             msg.Tps = _chainData.Transactions.Count / _blockDurationTime;
 
+            _log.Information("SendCompetitorsStatsRecap");
             _telegramNotifier.SendCompetitorsStatsRecap(msg);
         }
 
