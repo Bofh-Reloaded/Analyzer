@@ -5,7 +5,6 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
@@ -26,7 +25,6 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
-using static System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
@@ -294,8 +292,8 @@ namespace AnalyzerCore.Services
         {
             _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}",
                 _chainName, _version);
-            _telegramNotifier.SendMessage(
-                $"Starting TokenObserverService for chain: {_chainName} with version: {_version}");
+            // _telegramNotifier.SendMessage(
+            //    $"Starting TokenObserverService for chain: {_chainName} with version: {_version}");
             stoppingToken.Register(() =>
                 {
                     _log.Information("TokenObserverService background task is stopping for chain: {ChainName}",
