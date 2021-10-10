@@ -18,19 +18,24 @@ namespace AnalyzerCore.Services
     {
         public class ChainData
         {
-            private readonly List<string> _addressesToAnalyze;
+            private readonly IEnumerable<string> _competitorListToAnalyze;
             private readonly string _chainName;
             private readonly Task<HexBigInteger> _currentBlock;
             private readonly Logger _log;
             private readonly int _maxParallelism;
             public readonly Dictionary<string, Address> Addresses;
             public readonly BlockingCollection<EnTransaction> Transactions;
-            public readonly Web3 Web3;
+            private readonly Web3 _web3;
 
 
-            public ChainData(Web3 web3, string chainName, int maxParallelism, List<string> addresses)
+            public ChainData(Web3 web3,
+                string chainName,
+                int maxParallelism,
+                IEnumerable<string> competitorList,
+                IEnumerable<string> ourAddresses,
+                LogEventLevel logEventLevel)
             {
-                Web3 = web3;
+                _web3 = web3;
                 if (chainName != null) _chainName = chainName;
                 _maxParallelism = maxParallelism;
                 _log = new LoggerConfiguration()
@@ -40,15 +45,15 @@ namespace AnalyzerCore.Services
                     .Enrich.WithThreadId()
                     .Enrich.WithExceptionDetails()
                     .WriteTo.Console(
-                        restrictedToMinimumLevel: LogEventLevel.Information,
+                        restrictedToMinimumLevel: logEventLevel,
                         outputTemplate: $"{{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}} [{{Level:u3}}] [DataCollector:{_chainName}] " +
                                         "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
                 Transactions = new BlockingCollection<EnTransaction>();
                 Addresses = new Dictionary<string, Address>();
-                _addressesToAnalyze = addresses;
+                _competitorListToAnalyze = competitorList.Concat(ourAddresses);
                 // Reading current last block processed on chain
-                _currentBlock = Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+                _currentBlock = _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
                 _log.Debug($"Retrieved Block: {_currentBlock.Result}");
             }
@@ -66,7 +71,7 @@ namespace AnalyzerCore.Services
                         // Retrieve Transactions inside block X
                         blockParameter = new BlockParameter((ulong) b);
                         using var block =
-                            Web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
+                            _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(blockParameter);
                         try
                         {
                             block.Wait(cancellationToken);
@@ -74,7 +79,7 @@ namespace AnalyzerCore.Services
                         catch (Exception)
                         {
                             // Skip reading that block
-                            _log.Error($"Cannot retrieve block: {blockParameter}");
+                            _log.Error($"Cannot retrieve block: {blockParameter.BlockNumber.Value}");
                             return;
                         }
                         _log.Information(
@@ -85,11 +90,11 @@ namespace AnalyzerCore.Services
                             .Where(t => t.From != null && t.To != null), e =>
                         {
                             // Skip if we don't care about the address
-                            if (!_addressesToAnalyze.Contains(e.From.ToLower()) &&
-                                !_addressesToAnalyze.Contains(e.To.ToLower()))
+                            if (!_competitorListToAnalyze.Contains(e.From.ToLower()) &&
+                                !_competitorListToAnalyze.Contains(e.To.ToLower()))
                                 return;
                             totaltrx++;
-                            var txReceipt = Web3.Eth.Transactions.GetTransactionReceipt
+                            var txReceipt = _web3.Eth.Transactions.GetTransactionReceipt
                                 .SendRequestAsync(e.TransactionHash);
                             txReceipt.Wait(cancellationToken);
                             var enTx = new EnTransaction
@@ -106,7 +111,7 @@ namespace AnalyzerCore.Services
                     });
 
                 _log.Debug(
-                    $"Total trx: {totaltrx.ToString()} chainData.Transactions: {this.Transactions.Count.ToString()}");
+                    $"Total trx: {totaltrx.ToString()} chainData.Transactions: {Transactions.Count.ToString()}");
             }
 
             public void GetAddressTransactions(string address)

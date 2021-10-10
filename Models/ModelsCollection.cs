@@ -9,8 +9,7 @@ using Newtonsoft.Json;
 namespace AnalyzerCore.Models
 {
     public class ModelsCollection
-    {
-    }
+    {}
 
     public class Options
     {
@@ -48,28 +47,32 @@ namespace AnalyzerCore.Models
         public List<AddressStats> Addresses { get; set; }
         public int Tps { get; set; }
         public int TotalTrx { get; internal set; }
-        public string OurAddress { get; internal set; }
+        public string Address { get; internal set; }
     }
 
     public class Token
     {
         [JsonProperty]
         public string TokenAddress { get; set; }
-        public List<string> TransactionHashes { get; set; }
 
-        public string GetLatestTxHash()
-        {
-            return TransactionHashes.Count > 0 ? TransactionHashes.Last() : "00000000000000000000000000000000";
-        }
+        public List<string> TransactionHashes { get; set; }
         public List<string> ExchangesList { get; set; }
+
         [JsonProperty]
         public string TokenSymbol { get; set; }
+
         [JsonProperty]
         public BigInteger TokenTotalSupply { get; set; }
+
         public bool IsDeflationary { get; set; }
         public int TxCount { get; set; }
         public string From { get; set; }
         public string To { get; set; }
         public List<string> PoolsList { get; set; }
+
+        public string GetLatestTxHash()
+        {
+            return TransactionHashes.Count > 0 ? TransactionHashes.Last() : "00000000000000000000000000000000";
+        }
     }
 }

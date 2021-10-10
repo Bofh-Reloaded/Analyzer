@@ -1,63 +1,71 @@
-#nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
 using AnalyzerCore.Models;
 using AnalyzerCore.Notifier;
-using Serilog;
 using Microsoft.Extensions.Configuration;
 using Nethereum.Contracts.ContractHandlers;
+using Nethereum.JsonRpc.Client.Streaming;
+using Nethereum.JsonRpc.WebSocketStreamingClient;
+using Nethereum.RPC.Eth.DTOs;
+using Nethereum.RPC.Reactive.Eth.Subscriptions;
+using Nethereum.Web3;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Polly;
+using Serilog;
 using Serilog.Context;
+using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
-    public class TokenObserverService : BackgroundService, IObserver<DataCollectorService.ChainData>
+    public class TokenObserverService : BackgroundService
     {
-        private const string TASK_VERSION = "0.9-db-persistance";
-
-        private const string TASK_SYNC_EVENT_ADDRESS =
+        private const string TaskSyncEventAddress =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
-        private const int TASK_TASK_DELAY_MS = 60000;
         private readonly string _baseUri;
-        private readonly DataCollectorService.ChainDataHandler _chainDataHandler;
         private readonly string _chainName;
+        private readonly AnalyzerConfig _config;
+        private readonly ConcurrentBag<string> _inMemorySeenToken = new ConcurrentBag<string>();
 
-        private readonly Serilog.Core.Logger _log;
+        private readonly Logger _log;
         private readonly TelegramNotifier _telegramNotifier;
         private readonly List<string> _tokenAddressToCompareWith;
 
         private readonly string _tokenFileName;
-        private IDisposable _cancellation = null!;
+        private readonly string _version;
+
+        private readonly Web3 _web3;
 
         // Initialize configuration accessor
-        private IConfigurationRoot? _configuration;
+        private IConfigurationRoot _configuration;
 
         private TokenListConfig _tokenList = null!;
 
 
-        public TokenObserverService(
-            string chainName,
-            TelegramNotifier telegramNotifier,
-            DataCollectorService.ChainDataHandler chainDataHandler,
-            List<string> addressesToCompare,
-            string tokenFileName, string baseUri)
+        public TokenObserverService(AnalyzerConfig config, string version)
         {
-            _chainName = chainName;
-            _telegramNotifier = telegramNotifier;
-            _chainDataHandler = chainDataHandler;
-            _tokenAddressToCompareWith = addressesToCompare;
-            _baseUri = baseUri;
-            _tokenFileName = tokenFileName;
+            _chainName = config.ChainName;
+            _telegramNotifier = new TelegramNotifier(config.ServicesConfig.TokenAnalyzer.ChatId,
+                config.ServicesConfig.TokenAnalyzer.BotToken, config);
+            _tokenAddressToCompareWith = config.Enemies;
+            _baseUri = config.ServicesConfig.TokenAnalyzer.BaseUri;
+            _web3 = new Web3($"http://{config.RpcEndpoints.First()}:{config.RpcPort.ToString()}");
+            _tokenFileName = config.ServicesConfig.TokenAnalyzer.TokenFileName;
+            _config = config;
+            _version = version;
 
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -73,103 +81,6 @@ namespace AnalyzerCore.Services
             LogContext.PushProperty("SourceContext", $"{_chainName}");
         }
 
-        public void OnCompleted()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void OnError(Exception error)
-        {
-            throw new NotImplementedException();
-        }
-
-        public async void OnNext(DataCollectorService.ChainData chainData)
-        {
-            try
-            {
-                // Load configuration regarding tokens
-                _configuration = new ConfigurationBuilder()
-                    .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                    .AddJsonFile(_tokenFileName, false, true)
-                    .Build();
-            }
-            catch (Exception)
-            {
-                _log.Error("Cannot load token file... skipping cycle");
-                _telegramNotifier.SendMessage(
-                    $"<b>Token file not present: {_tokenFileName}... I cannot check tokens \U0001F62D\U0001F62D\U0001F62D</b>");
-                return;
-            }
-
-            _log.Information("New Data Received");
-            if (chainData.Transactions.Count <= 0) return;
-            _tokenList = _configuration.Get<TokenListConfig>();
-            _tokenList.blacklisted ??= new List<string>();
-            List<string> completeTokenList = _tokenList.whitelisted.Concat(_tokenList.blacklisted).ToList();
-
-            _log.Information(
-                $"Analyzing addresses:{Environment.NewLine}{JsonConvert.SerializeObject(_tokenAddressToCompareWith, Formatting.Indented)}");
-            // Select only transaction from the address that we need analyze
-            var transactionsToAnalyze = chainData.Transactions
-                .Where(t =>
-                    _tokenAddressToCompareWith.Contains(t.Transaction.From.ToLower()) ||
-                    _tokenAddressToCompareWith.Contains(t.Transaction.To.ToLower()));
-            var enTransactions = transactionsToAnalyze.ToList();
-            _log.Debug($"Total transaction to analyze: {enTransactions.Count().ToString()}");
-            foreach (var t in enTransactions)
-            {
-                var poolsUsed = GetPoolUsedFromTransaction(t);
-                foreach (var poolContractHandler in poolsUsed.Select(pool =>
-                    chainData.Web3.Eth.GetContractHandler(pool.ToString())))
-                {
-                    try
-                    {
-                        List<string> tokens = await GetTokensFromPool(poolContractHandler);
-                        if (tokens.Count <= 0) return;
-                        var poolFactory = poolContractHandler.QueryAsync<FactoryFunction, string>();
-                        poolFactory.Wait();
-                        foreach (var token in tokens)
-                        {
-                            await using var db = new TokenDbContext();
-                            // Skip this token if we already have it
-                            if (completeTokenList.Contains(token))
-                            {
-                                _log.Debug($"Token: {token} already known.");
-                                continue;
-                            }
-
-                            _log.Debug($"[ ] Token: {token}");
-                            var tokenContractHandler = chainData.Web3.Eth.GetContractHandler(token);
-                            var tokenSymbol = tokenContractHandler.QueryAsync<SymbolFunction, string>();
-                            tokenSymbol.Wait();
-                            var tokenTotalSupply =
-                                tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
-                            tokenTotalSupply.Wait();
-                            _log.Debug(
-                                $"[  ] {tokenSymbol.Result} {tokenTotalSupply.Result.ToString()} {t.Transaction.TransactionHash} {poolFactory.Result}");
-                            EvaluateToken(
-                                token,
-                                tokenSymbol.Result,
-                                t.Transaction.TransactionHash,
-                                poolContractHandler.ContractAddress,
-                                poolFactory.Result,
-                                t);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        _log.Error(e.ToString());
-                    }
-                }
-            }
-            
-            _log.Information("Analysis complete");
-            await NotifyMissingTokens();
-            _log.Information("Cleaning Tokens");
-            // Clean up Telegram
-            await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);
-        }
-
         private async Task CleanUpTelegram(TokenDbContext context,
             ICollection<string> knownToken,
             TelegramNotifier telegramNotifier)
@@ -180,26 +91,70 @@ namespace AnalyzerCore.Services
             foreach (var token in notifiedTokens)
             {
                 if (!knownToken.Contains(token.TokenAddress)) continue;
-                _log.Information($"Deleting messageId: {token.TelegramMsgId}...");
-                var result = await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
-                if (result == false )
+                _log.Information("Deleting messageId: {TelegramMsgId}...", token.TelegramMsgId);
+                try
                 {
-                    await telegramNotifier.EditMessageAsync(token.TelegramMsgId, token.TokenSymbol);
+                    await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
                 }
+                catch (Exception)
+                {
+                    await telegramNotifier.EditMessageAsync(token.TelegramMsgId, $"token {token.TokenSymbol} added");
+                }
+
                 token.Deleted = true;
-                await context.SaveChangesAsync();
+                var policy = Policy.Handle<Exception>()
+                    .WaitAndRetryAsync(new[]
+                    {
+                        TimeSpan.FromSeconds(2),
+                        TimeSpan.FromSeconds(4),
+                        TimeSpan.FromSeconds(6)
+                    })
+                    .ExecuteAsync(async () => await context.SaveChangesAsync());
             }
         }
 
-        private static IEnumerable<JToken> GetPoolUsedFromTransaction(DataCollectorService.ChainData.EnTransaction enT)
+        private Task<TransactionReceipt> GetTransactionReceipt(string txHash)
         {
-            var logsList = enT.TransactionReceipt.Logs;
+            var result = _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash);
+            if (result == null)
+            {
+                _log.Error("result step 1 null");
+                throw new NullReferenceException();
+            }
 
-            var syncEventsInLogs = logsList.Where(
+            result.Wait();
+            if (result == null)
+            {
+                _log.Error("result step 2 null");
+                throw new NullReferenceException();
+            }
+
+            return result;
+        }
+
+        private IEnumerable<JToken> GetPoolUsedFromTransaction(Transaction enT)
+        {
+            var policy = Policy.Handle<Exception>()
+                .Retry(3,
+                    onRetry: (_, _) =>
+                    {
+                        _log.Error("Cannot retrieve: _web3.Eth.Transactions.GetTransactionReceipt");
+                    });
+            var result = policy.Execute(
+                () => GetTransactionReceipt(enT.TransactionHash)
+            );
+
+            if (result.Result.Logs.Count <= 0)
+            {
+                _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
+                throw new DataException();
+            }
+
+            var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
-                    TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
+                    TaskSyncEventAddress, StringComparison.Ordinal)
             ).ToList();
-            // Can't find any sync event, next...
+
             return syncEventsInLogs.Count == 0
                 ? new List<JToken>()
                 : syncEventsInLogs.Select(pool => pool["address"])
@@ -230,12 +185,12 @@ namespace AnalyzerCore.Services
             }
         }
 
-        private void EvaluateToken(string token, string tokenSymbol, string txHash, string poolAddress,
-            string exchangeAddress, DataCollectorService.ChainData.EnTransaction t)
+        private void ProcessTokenAndPersistInDb(string token, string tokenSymbol, string txHash, string poolAddress,
+            string exchangeAddress, Transaction t)
         {
             try
             {
-                _log.Information($"EvaluateToken: {token} with txHash: {txHash}");
+                _log.Information("EvaluateToken: {Token} with txHash: {TxHash}", token, txHash);
                 using var db = new TokenDbContext();
                 // If the token is not present in the database, let's add it.
                 var tokenToCheck = db.Tokens.FirstOrDefault(tokenEntity => tokenEntity.TokenAddress == token);
@@ -248,9 +203,12 @@ namespace AnalyzerCore.Services
                     if (toCheck?.TransactionHashes.FirstOrDefault(k => k.Hash == txHash) !=
                         null)
                     {
-                        _log.Information($"We already seen token: {token} within txHash: {txHash}, skipping...");
+                        _log.Information("We already seen token: {Token} within txHash: {TxHash}, skipping...",
+                            token,
+                            txHash);
                         return;
                     }
+
                     // Update token details if we haven't seen that trx yet
                     var entity = db.Tokens.FirstOrDefault(tokenEntity => tokenEntity.TokenAddress == token);
                     entity?.TransactionHashes.Add(new DbLayer.Models.TransactionHash()
@@ -260,18 +218,18 @@ namespace AnalyzerCore.Services
                     if (entity != null)
                     {
                         entity.TxCount = entity.TxCount + 1;
-                        entity.From = t.Transaction.From;
-                        entity.To = t.Transaction.To;
+                        entity.From = t.From;
+                        entity.To = t.To;
                         db.Entry(entity).Collection(c => c.Exchanges).Load();
-                        db.Entry(entity).Collection(c=>c.Pools).Load();
-                        if (entity.Exchanges.FirstOrDefault(e => e.Address==exchangeAddress.ToLower()) == null)
+                        db.Entry(entity).Collection(c => c.Pools).Load();
+                        if (entity.Exchanges.FirstOrDefault(e => e.Address == exchangeAddress.ToLower()) == null)
                             entity.Exchanges.Add(new DbLayer.Models.Exchange() { Address = exchangeAddress.ToLower() });
-                        if (entity.Pools.FirstOrDefault(p => p.Address==poolAddress.ToLower()) == null)
+                        if (entity.Pools.FirstOrDefault(p => p.Address == poolAddress.ToLower()) == null)
                             entity.Pools.Add(new DbLayer.Models.Pool() { Address = poolAddress.ToLower() });
                     }
                     else
                     {
-                        _log.Error($"Error retrieving entity for Token: {token}, database is not update");
+                        _log.Error("Error retrieving entity for Token: {Token}, database is not update", token);
                     }
 
                     db.SaveChanges();
@@ -280,12 +238,18 @@ namespace AnalyzerCore.Services
                 {
                     // CREATE TOKEN
                     // Create the object inside the dictionary since it's the first time that we see it
+                    if (_inMemorySeenToken.Contains(token))
+                    {
+                        _log.Warning("Token: {Token} already processed, avoid duplicate", token);
+                    }
+
+                    _inMemorySeenToken.Add(token);
                     db.Tokens.Add(new DbLayer.Models.TokenEntity
                     {
                         TokenAddress = token,
                         TokenSymbol = tokenSymbol,
-                        From = t.Transaction.From,
-                        To = t.Transaction.To,
+                        From = t.From,
+                        To = t.To,
                         IsDeflationary = false,
                         TxCount = 1,
                         Notified = false,
@@ -293,17 +257,17 @@ namespace AnalyzerCore.Services
                     });
                     db.SaveChanges();
                     var entity = db.Tokens.FirstOrDefault(e => e.TokenAddress == token);
-                    entity?.Exchanges.Add(new DbLayer.Models.Exchange()
+                    entity?.Exchanges.Add(new DbLayer.Models.Exchange
                     {
                         Address = exchangeAddress.ToLower()
                     });
-                    entity?.Pools.Add(new DbLayer.Models.Pool()
+                    entity?.Pools.Add(new DbLayer.Models.Pool
                     {
                         Address = poolAddress.ToLower()
                     });
-                    entity?.TransactionHashes.Add(new DbLayer.Models.TransactionHash()
+                    entity?.TransactionHashes.Add(new DbLayer.Models.TransactionHash
                     {
-                        Hash = t.Transaction.TransactionHash
+                        Hash = t.TransactionHash
                     });
                     db.SaveChanges();
                 }
@@ -313,95 +277,253 @@ namespace AnalyzerCore.Services
                 var totalTransactionsCount = db.Tokens.Where(entity => entity.TokenAddress == token)
                     .Select(e => e.TxCount).FirstOrDefault();
                 _log.Information(
-                    $"Found missing Token: {token} with TxHash: {txHash} with {totalExchangesFound} pools, total txCount: {totalTransactionsCount}");
+                    "Found missing Token: {Token} with TxHash: {TxHash} with {TotalExchangesFound} pools, total txCount: {TotalTransactionsCount}",
+                    token,
+                    txHash,
+                    totalExchangesFound.ToString(),
+                    totalTransactionsCount.ToString());
             }
             catch (Exception ex)
             {
-                _log.Error(ex.Message);
+                _log.Error("{Message}", ex.Message);
                 throw;
-            }
-        }
-
-        private async Task NotifyMissingTokens()
-        {
-            await using var context = new TokenDbContext();
-            var query = context.Tokens.Where(t => t.Notified == false);
-            var tokenToNotify = query.ToList();
-            _log.Debug($"MissingTokens: {tokenToNotify.ToList().Count.ToString()}");
-            if (tokenToNotify.ToList().Count <= 0)
-            {
-                _log.Information("No Missing token found this time");
-                return;
-            }
-
-            foreach (var t in tokenToNotify)
-            {
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.Exchanges)
-                    .LoadAsync();
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.Pools)
-                    .LoadAsync();
-                await context.Entry(t)
-                    .Collection(tokenEntity => tokenEntity.TransactionHashes)
-                    .LoadAsync();
-                const string star = "\U00002B50";
-                var transactionHash = t.TransactionHashes.FirstOrDefault()?.Hash;
-                var pools = t.Pools.ToList();
-                if (transactionHash != null)
-                {
-                    var msg = string.Join(
-                        Environment.NewLine,
-                        $"<b>{t.TokenSymbol} [<a href='{_baseUri}token/{t.TokenAddress}'>{t.TokenAddress}</a>]:</b>",
-                        $"{string.Concat(Enumerable.Repeat(star, t.TxCount))}",
-                        $"  totalSupplyChanged: {t.IsDeflationary.ToString()}",
-                        $"  totalTxCount: {t.TxCount.ToString()}",
-                        $"  lastTxSeen: <a href='{_baseUri}tx/{transactionHash}'>{transactionHash[..10]}...{transactionHash[^10..]}</a>",
-                        $"  from: <a href='{_baseUri}{t.From}'>{t.From[..10]}...{t.From[^10..]}</a>",
-                        $"  to: <a href='{_baseUri}{t.To}'>{t.To[..10]}...{t.To[^10..]}</a>",
-                        $"  pools: [{Environment.NewLine}{string.Join(Environment.NewLine, pools.Select(p => $"    <a href='{_baseUri}address/{p.Address.ToString()}'>{p.Address.ToString()[..10]}...{p.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        $"  exchanges: [{Environment.NewLine}{string.Join(Environment.NewLine, t.Exchanges.Select(e => $"    <a href='{_baseUri}address/{e.Address.ToString()}'>{e.Address.ToString()[..10]}...{e.Address.ToString()[^10..]}</a>"))}{Environment.NewLine}  ]",
-                        "  ver: 0.9-db-persistence"
-                    );
-                    
-                    _log.Information(JsonConvert.SerializeObject(msg, Formatting.Indented));
-                    var notifierResponse = await _telegramNotifier.SendMessageWithReturnAsync(msg);
-
-                    t.Notified = true;
-                    if (notifierResponse != null) t.TelegramMsgId = notifierResponse.MessageId;
-                }
-
-                await context.SaveChangesAsync();
-                await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Information($"Starting TokenObserverService for chain: {_chainName} with version: {TASK_VERSION}");
-            _telegramNotifier.SendMessage($"Starting TokenObserverService for chain: {_chainName} with version: {TASK_VERSION}");
+            _log.Information("Starting TokenObserverService for chain: {ChainName} with version: {TaskVersion}",
+                _chainName, _version);
+            // _telegramNotifier.SendMessage(
+            //    $"Starting TokenObserverService for chain: {_chainName} with version: {_version}");
             stoppingToken.Register(() =>
                 {
-                    Unsubscribe();
-                    _log.Information($"TokenObserverService background task is stopping for chain: {_chainName}");
+                    _log.Information("TokenObserverService background task is stopping for chain: {ChainName}",
+                        _chainName);
                 }
             );
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                Subscribe(_chainDataHandler);
-                await Task.Delay(TASK_TASK_DELAY_MS, stoppingToken);
+                var uri = $"ws://{_config.RpcEndpoints.First()}:{_config.WssPort.ToString()}";
+                _log.Information("Using WebSocket on: {Uri}", uri);
+                using var client = new StreamingWebSocketClient(uri);
+                // create the subscription
+                // (it won't start receiving data until Subscribe is called)
+                var subscription = new EthNewBlockHeadersObservableSubscription(client);
+
+                // attach a handler for when the subscription is first created (optional)
+                // this will occur once after Subscribe has been called
+                subscription.GetSubscribeResponseAsObservable().Subscribe(subscriptionId =>
+                    Console.WriteLine("Block Header subscription Id: " + subscriptionId));
+
+                DateTime? lastBlockNotification = null;
+                double secondsSinceLastBlock = 0;
+
+                // attach a handler for each block
+                // put your logic here
+                subscription.GetSubscriptionDataResponsesAsObservable().Subscribe(async block =>
+                {
+                    secondsSinceLastBlock = (lastBlockNotification == null)
+                        ? 0
+                        : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
+                    lastBlockNotification = DateTime.Now;
+                    var utcTimestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value);
+                    _log.Warning(
+                        "New Block. Number: {Block}, Timestamp UTC: {TimeStamp}, Seconds since last block received: {SecondsSinceLastBlock}",
+                        block.Number.Value,
+                        JsonConvert.SerializeObject(utcTimestamp.ToString()),
+                        secondsSinceLastBlock);
+                    await ProcessNewBlock(block, stoppingToken);
+                });
+
+                // handle unsubscription
+                // optional - but may be important depending on your use case
+                subscription.GetUnsubscribeResponseAsObservable().Subscribe(response =>
+                {
+                    _log.Warning("Block Header unsubscribe result: {Response}", response);
+                });
+
+                // open the websocket connection
+                await client.StartAsync();
+
+                // start the subscription
+                // this will only block long enough to register the subscription with the client
+                // once running - it won't block whilst waiting for blocks
+                // blocks will be delivered to our handler on another thread
+                await subscription.SubscribeAsync();
+
+                while (subscription.SubscriptionState is SubscriptionState.Subscribed or SubscriptionState.Subscribing)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                    _log.Warning("{SubscriptionState}", subscription.SubscriptionState);
+                    secondsSinceLastBlock = (lastBlockNotification == null)
+                        ? 0
+                        : (int)DateTime.Now.Subtract(lastBlockNotification.Value).TotalSeconds;
+                    _log.Warning("Last block notification: {SecondsSinceLastBlock} seconds ago", secondsSinceLastBlock);
+                    if (!(secondsSinceLastBlock > 20)) continue;
+                    _log.Error("Websocket streaming bugged, restarting...");
+                    await subscription.UnsubscribeAsync();
+                }
             }
         }
 
-        private void Subscribe(DataCollectorService.ChainDataHandler provider)
+        private List<string> ReloadTokenList()
         {
-            _cancellation = provider.Subscribe(this);
+            try
+            {
+                // Load configuration regarding tokens
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                    .AddJsonFile(_tokenFileName, false, true)
+                    .Build();
+            }
+            catch (Exception)
+            {
+                _log.Error("Cannot load token file... skipping cycle");
+                _telegramNotifier.SendMessage(
+                    $"<b>Token file not present: {_tokenFileName}... I cannot check tokens \U0001F62D\U0001F62D\U0001F62D</b>");
+            }
+
+            _tokenList = _configuration.Get<TokenListConfig>();
+            _tokenList.blacklisted ??= new List<string>();
+            return _tokenList.whitelisted.Concat(_tokenList.blacklisted).ToList();
         }
 
-        private void Unsubscribe()
+        private async Task ProcessNewBlock(Block block, CancellationToken cancellationToken)
         {
-            _cancellation.Dispose();
+            _log.Information("New Block Received: {Block}", block.Number.Value);
+
+            List<string> completeTokenList = ReloadTokenList();
+
+            // Retrieve Transactions inside the block
+            _log.Information("getting transactions inside block");
+            BlockWithTransactions blockTransactions;
+            try
+            {
+                blockTransactions = await
+                    _web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(
+                        new BlockParameter((ulong)block.Number.Value));
+            }
+            catch (Exception e)
+            {
+                _log.Error("{Message}", e.Message);
+                return;
+            }
+
+            _log.Information("transactions retrieved");
+
+            // Slow down...
+            if (blockTransactions != null)
+            {
+                _log.Information(
+                    "Transaction inside block [{Block}]: {BlockTransactions}",
+                    block.Number.Value.Sign,
+                    blockTransactions.Transactions.Length);
+
+                // Select only transaction from the address that we need analyze
+                var transactionsToAnalyze = new List<Transaction>();
+                foreach (var tx in blockTransactions.Transactions)
+                {
+                    var fromAddr = tx.From?.ToLower();
+                    var toAddr = tx.To?.ToLower();
+                    if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr))
+                        transactionsToAnalyze.Add(tx);
+                    if (toAddr != null && _tokenAddressToCompareWith.Contains(toAddr)) transactionsToAnalyze.Add(tx);
+                }
+
+                var enTransactions = transactionsToAnalyze.ToList();
+                _log.Debug("Total transaction to analyze: {TransactionsCount}", enTransactions.Count.ToString());
+                foreach (var t in enTransactions)
+                {
+                    IEnumerable<JToken> poolsUsed = null;
+                    var policy = Policy.Handle<Exception>()
+                        .WaitAndRetryAsync(new[]
+                            {
+                                TimeSpan.FromSeconds(1),
+                                TimeSpan.FromSeconds(2),
+                                TimeSpan.FromSeconds(4)
+                            },
+                            onRetry: (_, _) =>
+                            {
+                                _log.Error("cannot retrieve used pool, retry");
+                                _log.Debug(JsonSerializer.Serialize(poolsUsed,
+                                    new JsonSerializerOptions() { WriteIndented = true }));
+                            });
+                    IEnumerable<JToken> result;
+                    try
+                    {
+                        result = await policy.ExecuteAsync(
+                            async () => GetPoolUsedFromTransaction(t)
+                        );
+                    }
+                    catch (System.Data.DataException)
+                    {
+                        // we tried 3 times to read the logs, move on
+                        continue;
+                    }
+
+                    poolsUsed = result;
+
+                    foreach (var poolContractHandler in poolsUsed.Select(pool =>
+                        _web3.Eth.GetContractHandler(pool.ToString())))
+                    {
+                        try
+                        {
+                            var tokens = await GetTokensFromPool(poolContractHandler);
+                            if (tokens.Count <= 0) return;
+                            var poolFactory = poolContractHandler.QueryAsync<FactoryFunction, string>();
+                            poolFactory.Wait(cancellationToken);
+                            foreach (var token in tokens)
+                            {
+                                await using var db = new TokenDbContext();
+                                // Skip this token if we already have it
+                                if (completeTokenList.Contains(token))
+                                {
+                                    _log.Debug("Token: {Token} already known", token);
+                                    continue;
+                                }
+
+                                _log.Debug("[ ] Token: {Token}", token);
+                                var tokenContractHandler = _web3.Eth.GetContractHandler(token);
+                                var tokenSymbol = await tokenContractHandler.QueryAsync<SymbolFunction, string>();
+                                var tokenTotalSupply =
+                                    await tokenContractHandler.QueryAsync<TotalSupplyFunction, BigInteger>();
+                                _log.Debug(
+                                    "[  ] {TokenSymbol} {TokenTotalSupply} {TransactionHash} {PoolFactory}",
+                                    tokenSymbol,
+                                    tokenTotalSupply.ToString(),
+                                    t.TransactionHash,
+                                    poolFactory.Result
+                                );
+                                ProcessTokenAndPersistInDb(
+                                    token,
+                                    tokenSymbol,
+                                    t.TransactionHash,
+                                    poolContractHandler.ContractAddress,
+                                    poolFactory.Result,
+                                    t);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _log.Error("{Message}", e.ToString());
+                        }
+                    }
+                }
+            }
+
+            // Notify new tokens found
+            _log.Information("Analysis complete");
+            await _telegramNotifier.NotifyMissingTokens(_baseUri, _version);
+
+            // Clean up Telegram
+            _log.Information("Cleaning Tokens");
+            await CleanUpTelegram(new TokenDbContext(), completeTokenList, _telegramNotifier);
+
+            // Update tokens
+            _log.Information("Update Tokens Messages");
+            await _telegramNotifier.UpdateMissingTokensAsync(_baseUri, _version);
         }
     }
 }

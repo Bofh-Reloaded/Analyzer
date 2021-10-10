@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
+using CommandLine;
 using AnalyzerCore.Models;
-using AnalyzerCore.Notifier;
 using AnalyzerCore.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,16 +9,25 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using Serilog.Exceptions;
+using AnalyzerService = AnalyzerCore.Services.AnalyzerService;
 
 namespace AnalyzerCore
 {
     internal static class Program
     {
+        private const string TaskVersion = "0.9.5-db-persistance-websocket";
+
+        private static string _configFileName;
+        private static bool _statsEnabled = false;
+        private static bool _tokenAnalyzerEnabled = false;
+        private static bool _porcoDioEnabled = false;
+        private const LogEventLevel TASK_LOG_EVENT_LEVEL = LogEventLevel.Information;
+
         private static void Main(string[] args)
         {
             var log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .Enrich.WithThreadId()
                 .Enrich.WithExceptionDetails()
@@ -26,6 +35,20 @@ namespace AnalyzerCore
                     outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] " +
                                     "[ThreadId {ThreadId}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
+
+            Parser.Default.ParseArguments<Options>(args)
+                .WithParsed(o =>
+                {
+                    if (o.Config.Length > 0)
+                    {
+                        _configFileName = o.Config;
+                    }
+
+                    _statsEnabled = o.Stats;
+                    _tokenAnalyzerEnabled = o.Token;
+                    _porcoDioEnabled = o.Porco;
+
+                });
 
             CreateHostBuilder(args).Build().Run();
         }
@@ -38,214 +61,58 @@ namespace AnalyzerCore
                     // Define Configuration File Reader
                     IConfiguration configuration = new ConfigurationBuilder()
                         .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                        .AddJsonFile("appSettings.json", false, true)
+                        .AddJsonFile(_configFileName, false, true)
                         .Build();
 
                     // Map json configuration inside Object
                     var section = configuration.GetSection(nameof(AnalyzerConfig));
                     var analyzerConfig = section.Get<AnalyzerConfig>();
 
-                    // Poly
-                    var plyAllAddresses = analyzerConfig.Ply.Enemies;
-                    plyAllAddresses.Add(analyzerConfig.Ply.Address);
-                    var plyDataHandler =
+                    var dataHandler =
                         new DataCollectorService.ChainDataHandler();
-                    if (analyzerConfig.Ply.ServicesConfig.AnalyzerService)
+                    if (_statsEnabled)
                     {
-                        services.AddSingleton<IHostedService>(
-                            _ => new AnalyzerService(
-                                "PolygonChain",
-                                analyzerConfig.Ply.Enemies,
-                                new TelegramNotifier(
-                                    "-532850503",
-                                    "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
-                                5,
-                                analyzerConfig.Ply.Address,
-                                plyDataHandler
-                            )
+                        services.AddScoped<IHostedService>(
+                            _ => new AnalyzerService(analyzerConfig, dataHandler, TaskVersion)
                         );
                     }
 
-                    if (analyzerConfig.Ply.ServicesConfig.TokenAnalyzer)
+                    if (_tokenAnalyzerEnabled)
                     {
-                        services.AddSingleton<IHostedService>(
-                            _ => new TokenObserverService(
-                                chainName: "PolygonChain",
-                                telegramNotifier: new TelegramNotifier(
-                                    "-568322563",
-                                    "1884927181:AAHOZNBdOaTURiZ5-5r669-sIzXUY2ZNiVo"),
-                                chainDataHandler: plyDataHandler,
-                                addressesToCompare: analyzerConfig.Ply.Enemies,
-                                "polygon_tokenlists.data",
-                                "https://polygonscan.com/")
+                        services.AddScoped<IHostedService>(
+                            _ => new TokenObserverService(analyzerConfig, TaskVersion)
                         );
                     }
 
-                    if (analyzerConfig.Ply.ServicesConfig.DataCollector)
+                    if (_statsEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(
-                                "PolygonChain",
-                                analyzerConfig.Ply.RpcEndpoint,
-                                analyzerConfig.Ply.ServicesConfig.MaxParallelism,
-                                plyDataHandler,
-                                plyAllAddresses
-                            ));
-                    }
-
-
-                    // Bsc
-                    var bscAllAddresses = analyzerConfig.Bsc.Enemies;
-                    bscAllAddresses.Add(analyzerConfig.Bsc.Address);
-                    var bscDataHandler =
-                        new DataCollectorService.ChainDataHandler();
-                    if (analyzerConfig.Bsc.ServicesConfig.AnalyzerService)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new AnalyzerService(
-                                "BinanceSmartChain",
-                                analyzerConfig.Bsc.Enemies,
-                                new TelegramNotifier(
-                                    "-560874043",
-                                    "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
-                                5,
-                                analyzerConfig.Bsc.Address,
-                                bscDataHandler
-                            )
+                            _ => new DataCollectorService(analyzerConfig, dataHandler, TaskVersion, TASK_LOG_EVENT_LEVEL)
                         );
                     }
 
-                    if (analyzerConfig.Bsc.ServicesConfig.TokenAnalyzer)
+                    if (_porcoDioEnabled)
                     {
                         services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(
-                                chainName: "BinanceSmartChain",
-                                telegramNotifier: new TelegramNotifier(
-                                    "-556783420",
-                                    "1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk"),
-                                chainDataHandler: bscDataHandler,
-                                addressesToCompare: analyzerConfig.Bsc.Enemies,
-                                "bsc_tokenlists.data",
-                                "https://www.bscscan.com/")
+                            _ => new PorcoDioService(analyzerConfig, TaskVersion)
                         );
-                    }
-
-                    if (analyzerConfig.Bsc.ServicesConfig.DataCollector)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(
-                                "BinanceSmartChain",
-                                analyzerConfig.Bsc.RpcEndpoint,
-                                analyzerConfig.Bsc.ServicesConfig.MaxParallelism,
-                                bscDataHandler,
-                                bscAllAddresses
-                            ));
-                    }
-
-                    if (analyzerConfig.Bsc.ServicesConfig.NewTokenService)
-                    {
-                        services.AddHostedService<NewTokenService>(
-                            _ => new NewTokenService(
-                                "BinanceSmartChain"
-                            ));
-                    }
-
-                    // Heco
-                    var hecoAllAddresses = analyzerConfig.Heco.Enemies;
-                    hecoAllAddresses.Add(analyzerConfig.Heco.Address);
-                    var hecoDataHandler =
-                        new DataCollectorService.ChainDataHandler();
-                    if (analyzerConfig.Heco.ServicesConfig.AnalyzerService)
-                    {
-                        services.AddSingleton<IHostedService>(
-                            _ => new AnalyzerService(
-                                "HecoChain",
-                                analyzerConfig.Heco.Enemies,
-                                new TelegramNotifier(
-                                    "-516536036",
-                                    "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
-                                5,
-                                analyzerConfig.Heco.Address,
-                                hecoDataHandler
-                            )
-                        );
-                    }
-
-                    if (analyzerConfig.Heco.ServicesConfig.TokenAnalyzer)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(
-                                chainName: "HecoChain",
-                                telegramNotifier: new TelegramNotifier(
-                                    "-516536036",
-                                    "1970460018:AAHp9Kfs2RTAYhV_DE45RF6FgRnDYG1lEeg"),
-                                chainDataHandler: hecoDataHandler,
-                                addressesToCompare: analyzerConfig.Heco.Enemies,
-                                "heco_tokenlists.data",
-                                "https://hecoinfo.com/")
-                        );
-                    }
-
-                    if (analyzerConfig.Heco.ServicesConfig.DataCollector)
-                    {
-                        services.AddSingleton<IHostedService>(
-                            _ => new DataCollectorService(
-                                "HecoChain",
-                                analyzerConfig.Heco.RpcEndpoint,
-                                analyzerConfig.Heco.ServicesConfig.MaxParallelism,
-                                hecoDataHandler,
-                                hecoAllAddresses
-                            ));
-                    }
-
-                    // Ftm
-                    var ftmAllAddresses = analyzerConfig.Ftm.Enemies;
-                    ftmAllAddresses.Add(analyzerConfig.Ftm.Address);
-                    var ftmDataHandler =
-                        new DataCollectorService.ChainDataHandler();
-                    if (analyzerConfig.Ftm.ServicesConfig.AnalyzerService)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new AnalyzerService(
-                                "FantomChain",
-                                analyzerConfig.Ftm.Enemies,
-                                new TelegramNotifier(
-                                    "-516536036",
-                                    "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
-                                5,
-                                analyzerConfig.Ftm.Address,
-                                ftmDataHandler
-                            )
-                        );
-                    }
-
-                    if (analyzerConfig.Ftm.ServicesConfig.TokenAnalyzer)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new TokenObserverService(
-                                chainName: "FantomChain",
-                                telegramNotifier: new TelegramNotifier(
-                                    "-516536036",
-                                    "1932950248:AAEdMVOW5yobVmVicqYXlxqZ2mL1DOeMa-g"),
-                                chainDataHandler: ftmDataHandler,
-                                addressesToCompare: analyzerConfig.Ftm.Enemies,
-                                "fantom_tokenlists.data",
-                                "https://ftmscan.com/")
-                        );
-                    }
-
-                    if (analyzerConfig.Ftm.ServicesConfig.DataCollector)
-                    {
-                        services.AddScoped<IHostedService>(
-                            _ => new DataCollectorService(
-                                "FtmChain",
-                                analyzerConfig.Ftm.RpcEndpoint,
-                                analyzerConfig.Ftm.ServicesConfig.MaxParallelism,
-                                ftmDataHandler,
-                                ftmAllAddresses
-                            ));
                     }
                 });
+        }
+
+        private class Options
+        {
+            [Option('c', "config", Required = true, HelpText = "config file to load")]
+            public string Config { get; set; }
+            
+            [Option('s', "stats", Required=false, HelpText = "Start Stats Service")]
+            public bool Stats { get; set; }
+            
+            [Option('t', "token", Required = false, HelpText = "Start Token Analyzer Service")]
+            public bool Token { get; set; }
+            
+            [Option('k', "porco", Required = false, HelpText = "Porcodidio")]
+            public bool Porco { get; set; }
         }
     }
 }

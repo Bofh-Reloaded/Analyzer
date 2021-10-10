@@ -23,16 +23,22 @@ namespace AnalyzerCore.Services
 {
     public class NewTokenService : BackgroundService
     {
-        private readonly string _wssUri;
+        private static readonly TelegramBotClient Bot =
+            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
+
+        private static readonly string TelegramChatId = "-502311043";
+        private static readonly string TokenFileName = "bsc_tokenlists.data";
+        private readonly string _chainName;
+        private readonly TokenDbContext _db;
         private readonly Logger _log;
+        private readonly string _version;
+        private readonly string _wssUri;
 
-        private static string NewPairEvent { get; } =
-            "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
-
-        public NewTokenService(string chainName)
+        public NewTokenService(string chainName, string version)
         {
             _chainName = chainName;
             _wssUri = "wss://bsc-ws-node.nariox.org:443";
+            _version = version;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -47,14 +53,9 @@ namespace AnalyzerCore.Services
             _db = new TokenDbContext();
             _log.Information("Starting Service");
         }
-        
-        private static readonly TelegramBotClient Bot =
-            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
 
-        private static readonly string TelegramChatId = "-502311043";
-        private static readonly string TokenFileName = "bsc_tokenlists.data";
-        private readonly string _chainName;
-        private readonly TokenDbContext _db;
+        private static string NewPairEvent { get; } =
+            "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
 
         private static string GetLinkFromElement(string element, string type = "token")
         {
@@ -132,7 +133,7 @@ namespace AnalyzerCore.Services
                     }
                     catch (Exception ex)
                     {
-                        _log.Error(ex.ToString());
+                        _log.Error("{Error}", ex.ToString());
                     }
                 });
 
@@ -143,7 +144,7 @@ namespace AnalyzerCore.Services
                 // data will be received on a background thread
                 await subscription.SubscribeAsync(filterTransfers);
 
-                while (subscription.SubscriptionState == SubscriptionState.Subscribing || subscription.SubscriptionState == SubscriptionState.Subscribed)
+                while (subscription.SubscriptionState is SubscriptionState.Subscribing or SubscriptionState.Subscribed)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
                 }

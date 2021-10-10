@@ -10,9 +10,6 @@ namespace AnalyzerCore.DbLayer
         {
 
         }
-        
-        protected override void OnConfiguring(DbContextOptionsBuilder options)
-            => options.UseSqlite($"Data Source=local.db");
 
         private string DbPath
         { get; set; }
@@ -22,5 +19,8 @@ namespace AnalyzerCore.DbLayer
         public DbSet<Models.Pool> Pools { get; set; }
         public DbSet<Models.Exchange> Exchanges { get; set; }
         public DbSet<Models.TransactionHash> TransactionHashes { get; set; }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder options)
+            => options.UseSqlite($"Data Source=local.db");
     }
 }
