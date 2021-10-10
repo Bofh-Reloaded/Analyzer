@@ -5,6 +5,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.DbLayer;
@@ -25,12 +26,13 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using static System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService
     {
-        private const string TASK_TASK_SYNC_EVENT_ADDRESS =
+        private const string TaskSyncEventAddress =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private readonly string _baseUri;
@@ -141,11 +143,16 @@ namespace AnalyzerCore.Services
             var result = policy.Execute(
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
-            if (result.Result.Logs.Count < 0) throw new DataException();
 
+            if (result.Result.Logs.Count <= 0)
+            {
+                _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
+                throw new DataException();
+            }
+            
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
-                    TASK_TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
+                    TaskSyncEventAddress, StringComparison.Ordinal)
             ).ToList();
 
             return syncEventsInLogs.Count == 0
@@ -418,8 +425,6 @@ namespace AnalyzerCore.Services
                 var transactionsToAnalyze = new List<Transaction>();
                 foreach (var tx in blockTransactions.Transactions)
                 {
-                    var r = await _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(tx.BlockHash);
-                    if (r == null || r.Failed()) continue;
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
                     if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr))
@@ -449,7 +454,7 @@ namespace AnalyzerCore.Services
                     {
                         try
                         {
-                            var tokens = await GetTokensFromPool(poolContractHandler);
+                            List<string> tokens = await GetTokensFromPool(poolContractHandler);
                             if (tokens.Count <= 0) return;
                             var poolFactory = poolContractHandler.QueryAsync<FactoryFunction, string>();
                             poolFactory.Wait(cancellationToken);
