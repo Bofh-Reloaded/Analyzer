@@ -85,6 +85,7 @@ namespace AnalyzerCore.Notifier
             catch (Exception e)
             {
                 _log.Error("{Message}", e.Message);
+                return false;
             }
         }
 
