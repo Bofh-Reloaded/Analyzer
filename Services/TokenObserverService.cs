@@ -141,13 +141,8 @@ namespace AnalyzerCore.Services
             var result = policy.Execute(
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
+            if (result.Result.HasLogs() is not true) return new List<JToken>();
 
-            if (result.Result.Logs.Count <= 0)
-            {
-                _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
-                throw new DataException();
-            }
-            
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
@@ -454,7 +449,7 @@ namespace AnalyzerCore.Services
                     {
                         try
                         {
-                            List<string> tokens = await GetTokensFromPool(poolContractHandler);
+                            var tokens = await GetTokensFromPool(poolContractHandler);
                             if (tokens.Count <= 0) return;
                             var poolFactory = poolContractHandler.QueryAsync<FactoryFunction, string>();
                             poolFactory.Wait(cancellationToken);
