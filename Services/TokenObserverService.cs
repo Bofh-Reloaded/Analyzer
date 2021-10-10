@@ -423,6 +423,8 @@ namespace AnalyzerCore.Services
                 var transactionsToAnalyze = new List<Transaction>();
                 foreach (var tx in blockTransactions.Transactions)
                 {
+                    var r = await _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(tx.BlockHash);
+                    if (r.Failed()) continue;
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
                     if (fromAddr != null && _tokenAddressToCompareWith.Contains(fromAddr))
