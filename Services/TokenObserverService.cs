@@ -26,7 +26,7 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
-using static System.Text.Json.JsonSerializer;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
@@ -446,6 +446,7 @@ namespace AnalyzerCore.Services
                             onRetry: (_, _) =>
                             {
                                 _log.Error("cannot retrieve used pool, retry");
+                                _log.Debug(JsonSerializer.Serialize(poolsUsed, new JsonSerializerOptions() {WriteIndented = true}));
                             });
                     var result = await policy.ExecuteAsync(
                         async () => GetPoolUsedFromTransaction(t)
