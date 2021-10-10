@@ -249,7 +249,7 @@ namespace AnalyzerCore.Services
             _log.Information("Starting AnalyzerService for chain: {ChainName}, version: {Version}",
                 _chainName,
                 _version);
-            _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}, version: {_version}");
+            // _telegramNotifier.SendMessage($"Starting AnalyzerService for chain: {_chainName}, version: {_version}");
             stoppingToken.Register(() =>
                 {
                     Unsubscribe();
