@@ -420,7 +420,6 @@ namespace AnalyzerCore.Services
                 foreach (var tx in blockTransactions.Transactions)
                 {
                     var r = await _web3.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(tx.BlockHash);
-                    _log.Debug(JsonSerializer.Serialize(r));
                     if (r == null || r.Failed()) continue;
                     var fromAddr = tx.From?.ToLower();
                     var toAddr = tx.To?.ToLower();
