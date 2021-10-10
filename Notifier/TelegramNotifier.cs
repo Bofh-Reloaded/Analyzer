@@ -254,9 +254,9 @@ namespace AnalyzerCore.Notifier
         public async void SendOurStatsRecap(Message message)
         {
             _log.Information("SendOurStatsRecap");
+            var m = new List<string> { message.Timestamp };
             foreach (var a in message.Addresses)
             {
-                var m = new List<string> { message.Timestamp };
                 _log.Debug("Processing our address: {Wallet}", a.Address);
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
@@ -291,13 +291,13 @@ namespace AnalyzerCore.Notifier
                         throw;
                     }
                 }
-
-                var _ = await _bot.SendTextMessageAsync(
-                    _chatId,
-                    Join(Environment.NewLine, m.ToArray()),
-                    ParseMode.Html
-                );
             }
+            
+            var _ = await _bot.SendTextMessageAsync(
+                _chatId,
+                Join(Environment.NewLine, m.ToArray()),
+                ParseMode.Html
+            );
         }
 
         public async void SendStatsRecap(Message message)

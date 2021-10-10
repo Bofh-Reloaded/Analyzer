@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using AnalyzerCore.Models;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
-using Org.BouncyCastle.Math.EC;
 using Serilog;
 using Serilog.Context;
 using Serilog.Core;

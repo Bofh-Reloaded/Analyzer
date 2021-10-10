@@ -21,7 +21,7 @@ namespace AnalyzerCore
         private static bool _statsEnabled = false;
         private static bool _tokenAnalyzerEnabled = false;
         private static bool _porcoDioEnabled = false;
-        private static readonly LogEventLevel _logEventLevel = LogEventLevel.Information; 
+        private static readonly LogEventLevel _logEventLevel = LogEventLevel.Debug; 
 
         private static void Main(string[] args)
         {
