@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -143,13 +144,12 @@ namespace AnalyzerCore.Services
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
 
-            /*if (result.Result.Logs.Count <= 0)
+            if (result.Result.Logs.Count <= 0)
             {
                 _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
                 throw new DataException();
-            }*/
-
-            _log.Debug("{Message}", Serialize(result.Result, new JsonSerializerOptions() { WriteIndented = true }));
+            }
+            
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
