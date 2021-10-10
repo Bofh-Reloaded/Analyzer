@@ -32,7 +32,7 @@ namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService
     {
-        private const string TaskSyncEventAddress =
+        private const string TASK_TASK_SYNC_EVENT_ADDRESS =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private readonly string _baseUri;
@@ -152,7 +152,7 @@ namespace AnalyzerCore.Services
 
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
-                    TaskSyncEventAddress, StringComparison.Ordinal)
+                    TASK_TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
             ).ToList();
 
             return syncEventsInLogs.Count == 0
@@ -433,7 +433,8 @@ namespace AnalyzerCore.Services
                 }
 
                 var enTransactions = transactionsToAnalyze.ToList();
-                _log.Debug("Total transaction to analyze: {TransactionsCount}", enTransactions.Count.ToString());
+                _log.Debug("Total transaction to analyze: {TransactionsCount}", 
+                    enTransactions.Count.ToString());
                 foreach (var t in enTransactions)
                 {
                     IEnumerable<JToken> poolsUsed = null;
