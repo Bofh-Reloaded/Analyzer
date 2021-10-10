@@ -79,7 +79,7 @@ namespace AnalyzerCore.Services
                         catch (Exception)
                         {
                             // Skip reading that block
-                            _log.Error($"Cannot retrieve block: {blockParameter}");
+                            _log.Error($"Cannot retrieve block: {blockParameter.BlockNumber.Value}");
                             return;
                         }
                         _log.Information(

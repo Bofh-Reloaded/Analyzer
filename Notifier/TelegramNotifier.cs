@@ -231,7 +231,7 @@ namespace AnalyzerCore.Notifier
             return resp;
         }
 
-        public async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
+        private async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
         {
             try
             {
@@ -300,7 +300,7 @@ namespace AnalyzerCore.Notifier
             );
         }
 
-        public async void SendStatsRecap(Message message)
+        public async void SendCompetitorsStatsRecap(Message message)
         {
             var m = new List<string> { message.Timestamp };
             foreach (var a in message.Addresses)

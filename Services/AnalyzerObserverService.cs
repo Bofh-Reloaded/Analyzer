@@ -58,7 +58,7 @@ namespace AnalyzerCore.Services
             _ourAddresses = config.Wallets;
             _chainDataHandler = chainDataHandler;
             _version = version;
-            
+
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
@@ -89,11 +89,11 @@ namespace AnalyzerCore.Services
             DataCollectorService.ChainData chainData,
             string address)
         {
-            _log.Information("NB: {NumberOfBlocks} Evaluating SB: {AmountOfBlocks} TB: {CurrentBlock}"
+            /*_log.Debug("NB: {NumberOfBlocks} Evaluating SB: {AmountOfBlocks} TB: {CurrentBlock}"
                 ,
                 numberOfBlocks.ToString(),
                 (chainData.CurrentBlock.Value - numberOfBlocks),
-                chainData.CurrentBlock.Value.ToString());
+                chainData.CurrentBlock.Value.ToString());*/
             var trxToAnalyze =
                 chainData.Addresses[address]
                     .Transactions.Where(t =>
@@ -103,8 +103,8 @@ namespace AnalyzerCore.Services
                 .Where(
                     t => t.TransactionReceipt.Succeeded() && t.TransactionReceipt.Logs.Count > 0)
                 .ToList();
-            _log.Information("TRX to analyze: {NumberOfTransactionsToAnalyze}",
-                trxToAnalyze.Count().ToString());
+            /*_log.Debug("TRX to analyze: {NumberOfTransactionsToAnalyze}",
+                trxToAnalyze.Count().ToString());*/
 
             // Calculate the success rate and construct che BlockRangeStat object
             return new BlockRangeStats
@@ -128,9 +128,9 @@ namespace AnalyzerCore.Services
 
             // Propagating _chainData
             _chainData = chainData;
-            
+
             // Build and delivery stat message
-            // await ReportCompetitor();
+            await ReportCompetitor();
             var msg = await CreateOurAddressesReport();
             _telegramNotifier.SendOurStatsRecap(msg);
         }
@@ -206,6 +206,7 @@ namespace AnalyzerCore.Services
                 telegramMessage.TotalTrx = _chainData.Transactions.Count;
                 telegramMessage.Tps = _chainData.Transactions.Count / _blockDurationTime;
             }
+
             return telegramMessage;
         }
 
@@ -241,7 +242,7 @@ namespace AnalyzerCore.Services
             msg.TotalTrx = _chainData.Transactions.Count;
             msg.Tps = _chainData.Transactions.Count / _blockDurationTime;
 
-            _telegramNotifier.SendStatsRecap(msg);
+            _telegramNotifier.SendCompetitorsStatsRecap(msg);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
