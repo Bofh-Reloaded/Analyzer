@@ -25,13 +25,12 @@ using Serilog.Context;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace AnalyzerCore.Services
 {
     public class TokenObserverService : BackgroundService
     {
-        private const string TaskSyncEventAddress =
+        private const string TASK_TASK_SYNC_EVENT_ADDRESS =
             "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1";
 
         private readonly string _baseUri;
@@ -142,11 +141,11 @@ namespace AnalyzerCore.Services
             var result = policy.Execute(
                 () => GetTransactionReceipt(enT.TransactionHash)
             );
-            if (result.Result.HasLogs() is not true) return new List<JToken>();
+            if (result.Result.Logs.Count < 0) throw new DataException();
 
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
-                    TaskSyncEventAddress, StringComparison.Ordinal)
+                    TASK_TASK_SYNC_EVENT_ADDRESS, StringComparison.Ordinal)
             ).ToList();
 
             return syncEventsInLogs.Count == 0
