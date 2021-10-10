@@ -149,7 +149,7 @@ namespace AnalyzerCore.Services
                 _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
                 throw new DataException();
             }
-            
+
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
                     TaskSyncEventAddress, StringComparison.Ordinal)
@@ -438,19 +438,31 @@ namespace AnalyzerCore.Services
                 {
                     IEnumerable<JToken> poolsUsed = null;
                     var policy = Policy.Handle<Exception>()
-                        .WaitAndRetryAsync(new[] { 
-                            TimeSpan.FromSeconds(1), 
-                            TimeSpan.FromSeconds(2), 
-                            TimeSpan.FromSeconds(4)
+                        .WaitAndRetryAsync(new[]
+                            {
+                                TimeSpan.FromSeconds(1),
+                                TimeSpan.FromSeconds(2),
+                                TimeSpan.FromSeconds(4)
                             },
                             onRetry: (_, _) =>
                             {
                                 _log.Error("cannot retrieve used pool, retry");
-                                _log.Debug(JsonSerializer.Serialize(poolsUsed, new JsonSerializerOptions() {WriteIndented = true}));
+                                _log.Debug(JsonSerializer.Serialize(poolsUsed,
+                                    new JsonSerializerOptions() { WriteIndented = true }));
                             });
-                    var result = await policy.ExecuteAsync(
-                        async () => GetPoolUsedFromTransaction(t)
-                    );
+                    IEnumerable<JToken> result;
+                    try
+                    {
+                        result = await policy.ExecuteAsync(
+                            async () => GetPoolUsedFromTransaction(t)
+                        );
+                    }
+                    catch (System.Data.DataException)
+                    {
+                        // we tried 3 times to read the logs, move on
+                        continue;
+                    }
+
                     poolsUsed = result;
 
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
