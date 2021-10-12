@@ -55,7 +55,7 @@ namespace AnalyzerCore.Services
                 // Reading current last block processed on chain
                 _currentBlock = _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
                 _currentBlock.Wait();
-                _log.Debug($"Retrieved Block: {_currentBlock.Result}");
+                _log.Debug("Retrieved Block: {CurrentBlock}", _currentBlock.Result);
             }
 
             public HexBigInteger CurrentBlock => _currentBlock.Result;
@@ -79,11 +79,15 @@ namespace AnalyzerCore.Services
                         catch (Exception)
                         {
                             // Skip reading that block
-                            _log.Error($"Cannot retrieve block: {blockParameter.BlockNumber.Value}");
+                            _log.Error("Cannot retrieve block: {Block}", blockParameter.BlockNumber.Value);
                             return;
                         }
                         _log.Information(
-                            $"[{blockNum.ToString()}/500] block: {b.ToString()}, total trx: {block.Result.Transactions.Length.ToString()}");
+                            "[{BlockNum}/500] block: {BlockString}, total trx: {TransactionNumber}"
+                            ,blockNum.ToString()
+                            ,b.ToString()
+                            ,block.Result.Transactions.Length.ToString()
+                            );
                         blockNum++;
                         var txCounter = 0;
                         Parallel.ForEach(block.Result.Transactions
@@ -111,7 +115,8 @@ namespace AnalyzerCore.Services
                     });
 
                 _log.Debug(
-                    $"Total trx: {totaltrx.ToString()} chainData.Transactions: {Transactions.Count.ToString()}");
+                    $"Total trx: {totaltrx.ToString()} chainData.Transactions: {Transactions.Count.ToString()}"
+                    );
             }
 
             public void GetAddressTransactions(string address)

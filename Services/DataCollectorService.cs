@@ -94,7 +94,7 @@ namespace AnalyzerCore.Services
                 catch (Exception ex)
                 {
                     _log.Error("Cannot Connect to RPC Server");
-                    _log.Error("{ErrorMessage}", ex.Message);
+                    _log.Error("{ErrorMessage}", ex.StackTrace);
                     await StopAsync(cancellationToken: stoppingToken);
                     return;
                 }
