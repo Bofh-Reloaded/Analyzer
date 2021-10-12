@@ -261,6 +261,7 @@ namespace AnalyzerCore.Notifier
             foreach (var a in message.Addresses)
             {
                 _log.Debug("Processing our address: {Wallet}", a.Address);
+
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
                 if (totalTxInMaxBlockRange.First().TotalTransactionsPerBlockRange == 0)
