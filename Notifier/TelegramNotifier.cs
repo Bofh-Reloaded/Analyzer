@@ -34,7 +34,7 @@ namespace AnalyzerCore.Notifier
         private Dictionary<string, int> _tokenTransactionsCount = new();
         private readonly AnalyzerConfig _config;
 
-        private const string TASK_TASK_TMP_FILE_NAME = "tokensCont.json";
+        private const string TaskTaskTmpFileName = "tokensCont.json";
 
         public TelegramNotifier(string chatId, string botToken, AnalyzerConfig config)
         {
@@ -93,12 +93,12 @@ namespace AnalyzerCore.Notifier
         {
             try
             {
-                var f = System.IO.File.ReadAllText(TASK_TASK_TMP_FILE_NAME);
+                var f = System.IO.File.ReadAllText(TaskTaskTmpFileName);
                 _tokenTransactionsCount = JsonSerializer.Deserialize<Dictionary<string, int>>(f);
             }
             catch (Exception)
             {
-                _log.Error("file {Filename} not found, will be created later", TASK_TASK_TMP_FILE_NAME);
+                _log.Error("file {Filename} not found, will be created later", TaskTaskTmpFileName);
             }
         }
 
@@ -153,7 +153,7 @@ namespace AnalyzerCore.Notifier
                 _tokenTransactionsCount[t.TokenAddress] = t.TxCount;
                 var jsonString = JsonSerializer.Serialize(_tokenTransactionsCount,
                     new JsonSerializerOptions() { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(TASK_TASK_TMP_FILE_NAME, jsonString);
+                await System.IO.File.WriteAllTextAsync(TaskTaskTmpFileName, jsonString);
 
                 try
                 {

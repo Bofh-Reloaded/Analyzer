@@ -91,9 +91,10 @@ namespace AnalyzerCore.Services
                         _logEventLevel);
                     _log.Information("Retrieved currentBlock: {CurrentBlock}", chainData.CurrentBlock);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     _log.Error("Cannot Connect to RPC Server");
+                    _log.Error("{ErrorMessage}", ex.Message);
                     await StopAsync(cancellationToken: stoppingToken);
                     return;
                 }
