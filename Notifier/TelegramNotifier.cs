@@ -74,18 +74,17 @@ namespace AnalyzerCore.Notifier
             }
         }
 
-        public async Task<bool> DeleteMessageAsync(int messageId)
+        public async Task DeleteMessageAsync(int messageId)
         {
             try
             {
                 _log.Debug("Deleting messageId: {MessageId} inside chat: {ChatId}", messageId, _chatId);
                 await _bot.DeleteMessageAsync(_chatId, messageId);
-                return true;
             }
             catch (Exception e)
             {
                 _log.Error("{Message}", e.Message);
-                return false;
+                throw;
             }
         }
 
