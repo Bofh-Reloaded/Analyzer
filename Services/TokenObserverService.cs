@@ -147,7 +147,7 @@ namespace AnalyzerCore.Services
             if (result.Result.Logs.Count <= 0)
             {
                 _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
-                throw new DataException();
+                return new List<JToken>();
             }
             
             // Take only successful transactions
