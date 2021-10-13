@@ -229,8 +229,17 @@ namespace AnalyzerCore.Notifier
 
         public async Task<Telegram.Bot.Types.Message> EditMessageAsync(int msgId, string text)
         {
-            var resp = await _bot.EditMessageTextAsync(_chatId, msgId, text);
-            return resp;
+            try
+            {
+                var resp = await _bot.EditMessageTextAsync(_chatId, msgId, text);
+                return resp;
+            }
+            catch (Exception)
+            {
+                return new Telegram.Bot.Types.Message();
+            }
+            
+            
         }
 
         private async Task<Telegram.Bot.Types.Message> SendMessageWithReturnAsync(string text)
