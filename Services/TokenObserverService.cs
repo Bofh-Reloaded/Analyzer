@@ -149,6 +149,9 @@ namespace AnalyzerCore.Services
                 _log.Error("Logs are empty for transaction hash: {Transaction}, we skip this", enT.TransactionHash);
                 throw new DataException();
             }
+            
+            // Take only successful transactions
+            if (result.Result.Succeeded() is not true) return new List<JToken>();
 
             var syncEventsInLogs = result.Result.Logs.Where(
                 e => string.Equals(e["topics"][0].ToString().ToLower(),
@@ -458,13 +461,15 @@ namespace AnalyzerCore.Services
                             async () => GetPoolUsedFromTransaction(t)
                         );
                     }
-                    catch (System.Data.DataException)
+                    catch (DataException)
                     {
                         // we tried 3 times to read the logs, move on
                         continue;
                     }
 
-                    poolsUsed = result;
+                    poolsUsed = result.ToList();
+
+                    if (!poolsUsed.Any()) continue;
 
                     foreach (var poolContractHandler in poolsUsed.Select(pool =>
                         _web3.Eth.GetContractHandler(pool.ToString())))
