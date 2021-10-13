@@ -331,7 +331,7 @@ namespace AnalyzerCore.Notifier
                     case "0xa2ca4fb5abb7c2d9a61ca75ee28de89ab8d8c178":
                         m.Add($"<b>[token-king]</b>");
                         break;
-                    case "0xaa7dcd270dd6734db602c3ea2e9749f74486619d":
+                    case "0x028898b50ba0ea9397ed7387bc8c21c784dea5d3":
                         m.Add($"<b>[cp-king]</b>");
                         break;
                     case "0x6eb0569afb79ec893c8212cbf4dbad74eea666aa":
@@ -339,6 +339,15 @@ namespace AnalyzerCore.Notifier
                         break;
                     case "0xf188b2a4cec428a479ab87e61d2e3bbf17f7c32a":
                         m.Add("<b>[new-competitor]</b>");
+                        break;
+                    case "0xc04db9cfeaf0d4728625a544e2284d0e022fc7fa":
+                        m.Add("<b>[uber-king-3]</b>");
+                        break;
+                    case "0x50a0621e5cfa139bcab947bf32efa07f0cf3cddf":
+                        m.Add("<b>[cp-king-junior-1]</b>");
+                        break;
+                    case "0x3317b3575c276e6b6fc74212aa0d32c1809674d6":
+                        m.Add("<b>[cp-king-junior-2</b>");
                         break;
                 }
 
