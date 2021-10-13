@@ -94,11 +94,14 @@ namespace AnalyzerCore.Services
                 _log.Information("Deleting messageId: {TelegramMsgId}...", token.TelegramMsgId);
                 try
                 {
-                    await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId);
+                    if (!await telegramNotifier.DeleteMessageAsync(token.TelegramMsgId))
+                    {
+                        await telegramNotifier.EditMessageAsync(token.TelegramMsgId, $"token {token.TokenSymbol} added");
+                    }
                 }
                 catch (Exception)
                 {
-                    await telegramNotifier.EditMessageAsync(token.TelegramMsgId, $"token {token.TokenSymbol} added");
+                    _log.Error("Cannot delete message");
                 }
 
                 token.Deleted = true;
