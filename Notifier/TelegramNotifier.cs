@@ -270,6 +270,10 @@ namespace AnalyzerCore.Notifier
             {
                 _log.Debug("Processing our address: {Wallet}", a.Address);
 
+                if (a.Address == "0xa8cc4b94624b31465e777f06ee3591fd5afe5821")
+                {
+                    m.Add($"<b>Contract Summary:</b>");
+                }
                 m.Add($"<b>\U0001F6A7[{a.Address}]\U0001F6A7</b>");
                 var totalTxInMaxBlockRange = a.BlockRanges.Where(b => b.BlockRange == 500);
                 if (totalTxInMaxBlockRange.First().TotalTransactionsPerBlockRange == 0)
