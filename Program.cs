@@ -10,6 +10,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Exceptions;
 using AnalyzerService = AnalyzerCore.Services.AnalyzerService;
+using NewTokenService = AnalyzerCore.Services.NewTokenService;
 
 namespace AnalyzerCore
 {
@@ -21,6 +22,7 @@ namespace AnalyzerCore
         private static bool _statsEnabled = false;
         private static bool _tokenAnalyzerEnabled = false;
         private static bool _porcoDioEnabled = false;
+        private static bool _newPairCreatedEnabled;
         private const LogEventLevel TASK_LOG_EVENT_LEVEL = LogEventLevel.Information;
 
         private static void Main(string[] args)
@@ -47,6 +49,7 @@ namespace AnalyzerCore
                     _statsEnabled = o.Stats;
                     _tokenAnalyzerEnabled = o.Token;
                     _porcoDioEnabled = o.Porco;
+                    _newPairCreatedEnabled = o.NewPair;
 
                 });
 
@@ -97,6 +100,13 @@ namespace AnalyzerCore
                             _ => new PorcoDioService(analyzerConfig, TaskVersion)
                         );
                     }
+
+                    if (_newPairCreatedEnabled)
+                    {
+                        services.AddScoped<IHostedService>(
+                            _ => new NewTokenService("analyzerConfig", TaskVersion)
+                        );
+                    }
                 });
         }
 
@@ -113,6 +123,9 @@ namespace AnalyzerCore
             
             [Option('k', "porco", Required = false, HelpText = "Porcodidio")]
             public bool Porco { get; set; }
+            
+            [Option('n', "newpaircreated", Required=false,HelpText = "NewPairCreated")]
+            public bool NewPair { get; set; }
         }
     }
 }

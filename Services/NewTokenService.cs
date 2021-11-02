@@ -24,10 +24,10 @@ namespace AnalyzerCore.Services
     public class NewTokenService : BackgroundService
     {
         private static readonly TelegramBotClient Bot =
-            new TelegramBotClient("1904993999:AAHxKSPSxPYhmfYOqP1ty11l7Qvts9D0aqk");
+            new TelegramBotClient("2036685778:AAGChF1xd5pasy7KHwPyxGQHwTmOl5n100g");
 
-        private static readonly string TelegramChatId = "-502311043";
-        private static readonly string TokenFileName = "bsc_tokenlists.data";
+        private static readonly string TelegramChatId = "-768446492";
+        // private static readonly string TokenFileName = "bsc_tokenlists.data";
         private readonly string _chainName;
         private readonly TokenDbContext _db;
         private readonly Logger _log;
@@ -70,13 +70,13 @@ namespace AnalyzerCore.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 // Load configuration regarding tokens
-                var configuration = new ConfigurationBuilder()
-                    .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                    .AddJsonFile(TokenFileName, false, true)
-                    .Build();
-                var tokenList = configuration.Get<TokenListConfig>();
-                tokenList.blacklisted ??= new List<string>();
-                using var client = new StreamingWebSocketClient("ws://195.201.169.14:8546");
+                // var configuration = new ConfigurationBuilder()
+                //     .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                //     .AddJsonFile(TokenFileName, false, true)
+                //     .Build();
+                // var tokenList = configuration.Get<TokenListConfig>();
+                // tokenList.blacklisted ??= new List<string>();
+                using var client = new StreamingWebSocketClient("wss://bsc-ws-node.nariox.org:443");
                 // create a log filter specific to Transfers
                 // this filter will match any Transfer (matching the signature) regardless of address
                 var filterTransfers = Event<PairCreatedEvent>.GetEventABI().CreateFilterInput();
@@ -99,6 +99,7 @@ namespace AnalyzerCore.Services
                         var token1 = log.Topics[1].ToString()?.Replace("0x000000000000000000000000", "0x");
                         var token2 = log.Topics[2].ToString()?.Replace("0x000000000000000000000000", "0x");
                         var pool = log.Data.Replace("0x000000000000000000000000", "0x")[..42];
+                        /*
                         var token1Flag = false;
                         var token2Flag = false;
                         if (token1 == null || token2 == null) return;
@@ -107,8 +108,9 @@ namespace AnalyzerCore.Services
                         if (tokenList.whitelisted.Contains(token2.ToLower()) ||
                             tokenList.blacklisted.Contains(token2.ToLower())) token2Flag = true;
                         if (token1Flag && token2Flag) return;
+                        */
                         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-                        var web3 = new Web3("http://136.243.15.134:8545");
+                        var web3 = new Web3("https://bsc-dataseed.binance.org");
                         var token1ContractHandler = web3.Eth.GetContractHandler(token1);
                         var token2ContractHandler = web3.Eth.GetContractHandler(token2);
                         var poolContractHandler = web3.Eth.GetContractHandler(pool);
