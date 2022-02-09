@@ -38,9 +38,6 @@ namespace AnalyzerCore.Notifier
 
         public TelegramNotifier(string chatId, string botToken, AnalyzerConfig config)
         {
-            _chatId = chatId;
-            _bot = new TelegramBotClient(botToken);
-            _config = config;
             _log = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -54,6 +51,10 @@ namespace AnalyzerCore.Notifier
                 .CreateLogger();
             LogContext.PushProperty("SourceContext", $"TelegramNotifier: {botToken}");
             LoadTokenDictionaryWithTxCount();
+            _chatId = chatId;
+            _log.Information($"Using Telegram Bot Token: {botToken}");
+            _bot = new TelegramBotClient(botToken);
+            _config = config;
         }
 
         public async void SendMessage(string text)
