@@ -6,9 +6,11 @@ using AnalyzerCore.Domain.Models;
 using AnalyzerCore.Domain.Services;
 using AnalyzerCore.Domain.ValueObjects;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Nethereum.RPC.Eth.DTOs;
+using Polly;
+using Polly.Retry;
 
 namespace AnalyzerCore.Infrastructure.BackgroundServices
 {
@@ -20,21 +22,42 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
         private readonly ChainConfig _chainConfig;
         private readonly int _pollingInterval;
         private readonly int _blocksToProcess;
+        private readonly int _retryDelay;
+        private readonly int _maxRetries;
+        private readonly AsyncRetryPolicy _retryPolicy;
 
         public BlockchainMonitorService(
             IBlockchainService blockchainService,
             IMediator mediator,
             ChainConfig chainConfig,
             ILogger<BlockchainMonitorService> logger,
-            int pollingInterval = 60000,
-            int blocksToProcess = 500)
+            IConfiguration configuration)
         {
             _blockchainService = blockchainService;
             _mediator = mediator;
             _chainConfig = chainConfig;
             _logger = logger;
-            _pollingInterval = pollingInterval;
-            _blocksToProcess = blocksToProcess;
+            
+            var monitoring = configuration.GetSection("Monitoring");
+            _pollingInterval = monitoring.GetValue<int>("PollingInterval");
+            _blocksToProcess = monitoring.GetValue<int>("BlocksToProcess");
+            _retryDelay = monitoring.GetValue<int>("RetryDelay");
+            _maxRetries = monitoring.GetValue<int>("MaxRetries");
+
+            _retryPolicy = Policy
+                .Handle<Exception>()
+                .WaitAndRetryAsync(
+                    _maxRetries,
+                    retryAttempt => TimeSpan.FromMilliseconds(_retryDelay * Math.Pow(2, retryAttempt - 1)),
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(
+                            exception,
+                            "Error connecting to blockchain (Attempt {RetryCount} of {MaxRetries}). Retrying in {Delay}ms...",
+                            retryCount,
+                            _maxRetries,
+                            timeSpan.TotalMilliseconds);
+                    });
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,57 +66,49 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                 "Starting blockchain monitor for chain {ChainName}",
                 _chainConfig.Name);
 
-            var lastProcessedBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
-
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
-                    if (currentBlock <= lastProcessedBlock)
+                    await _retryPolicy.ExecuteAsync(async () =>
                     {
+                        var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
+                        var fromBlock = currentBlock - _blocksToProcess;
+                        var toBlock = currentBlock;
+
                         _logger.LogInformation(
-                            "No new blocks to process on chain {ChainName}. Current: {Current}, Last: {Last}",
-                            _chainConfig.Name,
-                            currentBlock,
-                            lastProcessedBlock);
-                        
-                        await Task.Delay(_pollingInterval, stoppingToken);
-                        continue;
-                    }
+                            "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
+                            fromBlock,
+                            toBlock,
+                            _chainConfig.Name);
 
-                    var fromBlock = lastProcessedBlock + 1;
-                    var toBlock = System.Numerics.BigInteger.Min(lastProcessedBlock + _blocksToProcess, currentBlock);
-
-                    _logger.LogInformation(
-                        "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
-                        fromBlock,
-                        toBlock,
-                        _chainConfig.Name);
-
-                    var blocks = await _blockchainService.GetBlocksAsync(fromBlock, toBlock, stoppingToken);
-                    foreach (var block in blocks)
-                    {
-                        foreach (var tx in block.Transactions)
+                        var blocks = await _blockchainService.GetBlocksAsync(fromBlock, toBlock, stoppingToken);
+                        foreach (var block in blocks)
                         {
-                            if (await _blockchainService.IsContractAsync(tx.To, stoppingToken))
+                            if (stoppingToken.IsCancellationRequested) break;
+
+                            foreach (var tx in block.Transactions)
                             {
-                                await ProcessContractInteractionAsync(tx, stoppingToken);
+                                if (stoppingToken.IsCancellationRequested) break;
+
+                                if (!string.IsNullOrEmpty(tx.To) && await _blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                {
+                                    await ProcessContractInteractionAsync(tx, stoppingToken);
+                                }
                             }
                         }
-                    }
+                    });
 
-                    lastProcessedBlock = toBlock;
                     await Task.Delay(_pollingInterval, stoppingToken);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogError(
                         ex,
-                        "Error processing blocks on chain {ChainName}",
+                        "Error processing blocks on chain {ChainName}. Service will continue...",
                         _chainConfig.Name);
                     
-                    await Task.Delay(_pollingInterval * 2, stoppingToken);
+                    await Task.Delay(_pollingInterval, stoppingToken);
                 }
             }
         }
@@ -115,6 +130,12 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                         Type = poolInfo.Type,
                         ChainId = _chainConfig.ChainId
                     }, cancellationToken);
+
+                    _logger.LogInformation(
+                        "Processed new pool: {Address} ({Token0}/{Token1})",
+                        tx.To,
+                        poolInfo.Token0,
+                        poolInfo.Token1);
                 }
             }
             catch (Exception ex)

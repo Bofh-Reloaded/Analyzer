@@ -1,4 +1,3 @@
-using System;
 using AnalyzerCore.Application.Pools.Commands.CreatePool;
 using AnalyzerCore.Domain.Models;
 using AnalyzerCore.Domain.Repositories;
@@ -24,7 +23,9 @@ namespace AnalyzerCore.Api
         {
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Information()
-                .WriteTo.Console()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .CreateLogger();
 
             try
@@ -34,6 +35,7 @@ namespace AnalyzerCore.Api
             catch (Exception ex)
             {
                 Log.Fatal(ex, "Application startup failed");
+                throw;
             }
             finally
             {
@@ -46,22 +48,31 @@ namespace AnalyzerCore.Api
                 .UseSerilog()
                 .ConfigureServices((hostContext, services) =>
                 {
+                    var configuration = hostContext.Configuration;
+
                     // Configuration
-                    var chainConfig = hostContext.Configuration
+                    var chainConfig = configuration
                         .GetSection("ChainConfig")
                         .Get<ChainConfig>();
                     services.AddSingleton(chainConfig);
 
                     // Database
                     services.AddDbContext<ApplicationDbContext>(options =>
-                        options.UseSqlite(
-                            hostContext.Configuration.GetConnectionString("DefaultConnection")));
+                    {
+                        var connectionString = configuration.GetConnectionString("DefaultConnection");
+                        if (string.IsNullOrEmpty(connectionString))
+                        {
+                            throw new InvalidOperationException("Database connection string is not configured");
+                        }
+                        options.UseSqlite(connectionString);
+                    });
 
                     // Blockchain
                     services.AddSingleton<Web3>(provider =>
                     {
                         var config = provider.GetRequiredService<ChainConfig>();
-                        return new Web3($"http://{config.RpcUrl}:{config.RpcPort}");
+                        var url = $"https://{config.RpcUrl}";
+                        return new Web3(url);
                     });
                     services.AddScoped<IBlockchainService, BlockchainService>();
 

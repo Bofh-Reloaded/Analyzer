@@ -54,7 +54,7 @@ namespace AnalyzerCore.Infrastructure.Blockchain
                 for (var blockNumber = i; blockNumber <= end; blockNumber++)
                 {
                     var task = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
-                        .SendRequestAsync(new BlockParameter(blockNumber));
+                        .SendRequestAsync(new HexBigInteger(blockNumber));
                     tasks.Add(task);
                 }
 
@@ -163,8 +163,8 @@ namespace AnalyzerCore.Infrastructure.Blockchain
         {
             var filterInput = new NewFilterInput
             {
-                FromBlock = new BlockParameter(fromBlock),
-                ToBlock = new BlockParameter(toBlock),
+                FromBlock = new BlockParameter(new HexBigInteger(fromBlock)),
+                ToBlock = new BlockParameter(new HexBigInteger(toBlock)),
                 Address = new[] { address }
             };
 
