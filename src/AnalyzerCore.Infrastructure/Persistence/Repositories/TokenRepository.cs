@@ -23,14 +23,21 @@ namespace AnalyzerCore.Infrastructure.Persistence.Repositories
             _logger = logger;
         }
 
-        public async Task<Token> GetByAddressAsync(
+        public async Task<Token?> GetByAddressAsync(
             string address,
             string chainId,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(chainId))
+            {
+                return null;
+            }
+
+            var normalizedAddress = address.ToLowerInvariant();
             return await _context.Tokens
+                .AsNoTracking()
                 .FirstOrDefaultAsync(t => 
-                    t.Address.ToLower() == address.ToLower() && 
+                    t.Address == normalizedAddress && 
                     t.ChainId == chainId,
                     cancellationToken);
         }
@@ -40,6 +47,7 @@ namespace AnalyzerCore.Infrastructure.Persistence.Repositories
             CancellationToken cancellationToken = default)
         {
             return await _context.Tokens
+                .AsNoTracking()
                 .Where(t => t.ChainId == chainId)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync(cancellationToken);
@@ -62,9 +70,16 @@ namespace AnalyzerCore.Infrastructure.Persistence.Repositories
             string chainId,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(chainId))
+            {
+                return false;
+            }
+
+            var normalizedAddress = address.ToLowerInvariant();
             return await _context.Tokens
+                .AsNoTracking()
                 .AnyAsync(t => 
-                    t.Address.ToLower() == address.ToLower() && 
+                    t.Address == normalizedAddress && 
                     t.ChainId == chainId,
                     cancellationToken);
         }
@@ -75,6 +90,7 @@ namespace AnalyzerCore.Infrastructure.Persistence.Repositories
             CancellationToken cancellationToken = default)
         {
             return await _context.Tokens
+                .AsNoTracking()
                 .Where(t => 
                     t.CreatedAt >= timestamp &&
                     t.ChainId == chainId)

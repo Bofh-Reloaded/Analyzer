@@ -1,6 +1,9 @@
+using System;
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace AnalyzerCore.Infrastructure.Persistence
 {
@@ -9,8 +12,7 @@ namespace AnalyzerCore.Infrastructure.Persistence
         public ApplicationDbContext CreateDbContext(string[] args)
         {
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json")
+                .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json"), optional: false)
                 .Build();
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
@@ -20,7 +22,7 @@ namespace AnalyzerCore.Infrastructure.Persistence
 
             return new ApplicationDbContext(
                 optionsBuilder.Options,
-                null); // Logger is not needed for migrations
+                null); // Logger is optional for migrations
         }
     }
 }

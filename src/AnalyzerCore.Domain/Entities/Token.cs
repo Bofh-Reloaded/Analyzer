@@ -4,31 +4,33 @@ namespace AnalyzerCore.Domain.Entities
 {
     public class Token
     {
-        public Guid Id { get; private set; }
-        public string Address { get; private set; }
-        public string Symbol { get; private set; }
-        public string Name { get; private set; }
-        public int Decimals { get; private set; }
-        public DateTime CreatedAt { get; private set; }
-        public string ChainId { get; private set; }
+        private Token() { }  // For EF Core
 
-        private Token() { } // For EF Core
+        public int Id { get; set; }
+        public string Address { get; set; } = null!;
+        public string Symbol { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public int Decimals { get; set; }
+        public decimal TotalSupply { get; set; }
+        public string ChainId { get; set; } = null!;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public static Token Create(
             string address,
             string symbol,
             string name,
             int decimals,
+            decimal totalSupply,
             string chainId)
         {
             return new Token
             {
-                Id = Guid.NewGuid(),
-                Address = address?.ToLower() ?? throw new ArgumentNullException(nameof(address)),
-                Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol)),
-                Name = name ?? throw new ArgumentNullException(nameof(name)),
+                Address = address.ToLowerInvariant(),
+                Symbol = symbol.ToUpperInvariant(),
+                Name = name,
                 Decimals = decimals,
-                ChainId = chainId ?? throw new ArgumentNullException(nameof(chainId)),
+                TotalSupply = totalSupply,
+                ChainId = chainId,
                 CreatedAt = DateTime.UtcNow
             };
         }

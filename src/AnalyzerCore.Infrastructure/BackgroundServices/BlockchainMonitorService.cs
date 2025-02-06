@@ -103,9 +103,49 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                                 {
                                     if (stoppingToken.IsCancellationRequested) break;
 
-                                    if (!string.IsNullOrEmpty(tx.To) && await blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                    if (string.IsNullOrEmpty(tx.To))
                                     {
-                                        await ProcessContractInteractionAsync(blockchainService, mediator, tx, stoppingToken);
+                                        continue; // Skip contract creation transactions
+                                    }
+
+                                    try
+                                    {
+                                        if (!await blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                        {
+                                            continue; // Skip non-contract addresses
+                                        }
+
+                                        var poolInfo = await blockchainService.GetPoolInfoAsync(tx.To, stoppingToken);
+                                        if (poolInfo == null || 
+                                            string.IsNullOrEmpty(poolInfo.Token0) || 
+                                            string.IsNullOrEmpty(poolInfo.Token1) || 
+                                            string.IsNullOrEmpty(poolInfo.Factory))
+                                        {
+                                            continue; // Skip invalid pool info
+                                        }
+
+                                        _logger.LogInformation(
+                                            "Found pool at {Address} with tokens {Token0}/{Token1}",
+                                            tx.To,
+                                            poolInfo.Token0,
+                                            poolInfo.Token1);
+
+                                        await mediator.Send(new CreatePoolCommand
+                                        {
+                                            Address = tx.To,
+                                            Token0Address = poolInfo.Token0,
+                                            Token1Address = poolInfo.Token1,
+                                            Factory = poolInfo.Factory,
+                                            Type = poolInfo.Type,
+                                            ChainId = _chainConfig.ChainId
+                                        }, stoppingToken);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogDebug(
+                                            ex,
+                                            "Contract {Address} is not a pool",
+                                            tx.To);
                                     }
                                 }
                             }
@@ -129,60 +169,6 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                     
                     await Task.Delay(_pollingInterval, stoppingToken);
                 }
-            }
-        }
-
-        private async Task ProcessContractInteractionAsync(
-            IBlockchainService blockchainService,
-            IMediator mediator,
-            TransactionInfo tx,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                if (await IsPoolContractAsync(blockchainService, tx.To, cancellationToken))
-                {
-                    var poolInfo = await blockchainService.GetPoolInfoAsync(tx.To, cancellationToken);
-                    
-                    await mediator.Send(new CreatePoolCommand
-                    {
-                        Address = tx.To,
-                        Token0Address = poolInfo.Token0,
-                        Token1Address = poolInfo.Token1,
-                        Factory = poolInfo.Factory,
-                        Type = poolInfo.Type,
-                        ChainId = _chainConfig.ChainId
-                    }, cancellationToken);
-
-                    _logger.LogInformation(
-                        "Processed new pool: {Address} ({Token0}/{Token1})",
-                        tx.To,
-                        poolInfo.Token0,
-                        poolInfo.Token1);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Error processing contract interaction for transaction {Hash}",
-                    tx.Hash);
-            }
-        }
-
-        private async Task<bool> IsPoolContractAsync(
-            IBlockchainService blockchainService,
-            string address,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                await blockchainService.GetPoolInfoAsync(address, cancellationToken);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

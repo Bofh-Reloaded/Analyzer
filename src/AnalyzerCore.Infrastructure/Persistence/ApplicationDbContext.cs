@@ -9,18 +9,18 @@ namespace AnalyzerCore.Infrastructure.Persistence
 {
     public class ApplicationDbContext : DbContext
     {
-        private readonly ILogger<ApplicationDbContext> _logger;
+        private readonly ILogger<ApplicationDbContext>? _logger;
 
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options,
-            ILogger<ApplicationDbContext> logger)
+            ILogger<ApplicationDbContext>? logger = null)
             : base(options)
         {
             _logger = logger;
         }
 
-        public DbSet<Token> Tokens { get; set; }
-        public DbSet<Pool> Pools { get; set; }
+        public DbSet<Token> Tokens => Set<Token>();
+        public DbSet<Pool> Pools => Set<Pool>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -85,7 +85,7 @@ namespace AnalyzerCore.Infrastructure.Persistence
             }
             catch (DbUpdateException ex)
             {
-                _logger.LogError(ex, "Error saving changes to database");
+                _logger?.LogError(ex, "Error saving changes to database");
                 throw;
             }
         }
