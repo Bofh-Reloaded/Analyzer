@@ -4,9 +4,11 @@ using System.Threading.Tasks;
 using AnalyzerCore.Application.Pools.Commands.CreatePool;
 using AnalyzerCore.Domain.Models;
 using AnalyzerCore.Domain.Services;
+using AnalyzerCore.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Nethereum.RPC.Eth.DTOs;
 
 namespace AnalyzerCore.Infrastructure.BackgroundServices
 {
@@ -37,6 +39,10 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation(
+                "Starting blockchain monitor for chain {ChainName}",
+                _chainConfig.Name);
+
             var lastProcessedBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
@@ -46,12 +52,24 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                     var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
                     if (currentBlock <= lastProcessedBlock)
                     {
+                        _logger.LogInformation(
+                            "No new blocks to process on chain {ChainName}. Current: {Current}, Last: {Last}",
+                            _chainConfig.Name,
+                            currentBlock,
+                            lastProcessedBlock);
+                        
                         await Task.Delay(_pollingInterval, stoppingToken);
                         continue;
                     }
 
                     var fromBlock = lastProcessedBlock + 1;
-                    var toBlock = Math.Min(lastProcessedBlock + _blocksToProcess, currentBlock);
+                    var toBlock = System.Numerics.BigInteger.Min(lastProcessedBlock + _blocksToProcess, currentBlock);
+
+                    _logger.LogInformation(
+                        "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
+                        fromBlock,
+                        toBlock,
+                        _chainConfig.Name);
 
                     var blocks = await _blockchainService.GetBlocksAsync(fromBlock, toBlock, stoppingToken);
                     foreach (var block in blocks)
@@ -70,7 +88,11 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error processing blocks");
+                    _logger.LogError(
+                        ex,
+                        "Error processing blocks on chain {ChainName}",
+                        _chainConfig.Name);
+                    
                     await Task.Delay(_pollingInterval * 2, stoppingToken);
                 }
             }
@@ -97,7 +119,10 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing contract interaction");
+                _logger.LogError(
+                    ex,
+                    "Error processing contract interaction for transaction {Hash}",
+                    tx.Hash);
             }
         }
 

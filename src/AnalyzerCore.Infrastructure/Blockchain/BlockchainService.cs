@@ -49,39 +49,36 @@ namespace AnalyzerCore.Infrastructure.Blockchain
             for (var i = fromBlock; i <= toBlock; i += batchSize)
             {
                 var tasks = new List<Task<BlockWithTransactions>>();
-                var end = Math.Min(i + batchSize - 1, toBlock);
+                var end = BigInteger.Min(i + batchSize - 1, toBlock);
                 
                 for (var blockNumber = i; blockNumber <= end; blockNumber++)
                 {
                     var task = _web3.Eth.Blocks.GetBlockWithTransactionsByNumber
-                        .SendRequestAsync(new HexBigInteger(blockNumber));
+                        .SendRequestAsync(new BlockParameter(blockNumber));
                     tasks.Add(task);
                 }
 
                 var results = await Task.WhenAll(tasks);
                 
-                foreach (var block in results)
+                foreach (var block in results.Where(b => b != null))
                 {
-                    if (block != null)
+                    blocks.Add(new BlockData
                     {
-                        blocks.Add(new BlockData
+                        Number = block.Number.Value,
+                        Hash = block.BlockHash,
+                        Timestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value).UtcDateTime,
+                        Transactions = block.Transactions.Select(tx => new TransactionInfo
                         {
-                            Number = block.Number.Value,
-                            Hash = block.BlockHash,
-                            Timestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value).UtcDateTime,
-                            Transactions = block.Transactions.Select(tx => new TransactionInfo
-                            {
-                                Hash = tx.TransactionHash,
-                                From = tx.From,
-                                To = tx.To,
-                                Value = tx.Value.Value,
-                                Input = tx.Input,
-                                GasUsed = tx.Gas.Value,
-                                Status = true, // Need to get receipt for actual status
-                                Timestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value).UtcDateTime
-                            })
-                        });
-                    }
+                            Hash = tx.TransactionHash,
+                            From = tx.From,
+                            To = tx.To,
+                            Value = tx.Value.Value,
+                            Input = tx.Input,
+                            GasUsed = tx.Gas.Value,
+                            Status = true,
+                            Timestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value).UtcDateTime
+                        })
+                    });
                 }
             }
 
@@ -129,7 +126,7 @@ namespace AnalyzerCore.Infrastructure.Blockchain
                 Factory = await factoryTask,
                 Reserve0 = Web3.Convert.FromWei(reserves.Reserve0),
                 Reserve1 = Web3.Convert.FromWei(reserves.Reserve1),
-                Type = PoolType.UniswapV2 // Default to UniswapV2, can be updated based on factory address
+                Type = PoolType.UniswapV2
             };
         }
 
@@ -166,8 +163,8 @@ namespace AnalyzerCore.Infrastructure.Blockchain
         {
             var filterInput = new NewFilterInput
             {
-                FromBlock = new HexBigInteger(fromBlock),
-                ToBlock = new HexBigInteger(toBlock),
+                FromBlock = new BlockParameter(fromBlock),
+                ToBlock = new BlockParameter(toBlock),
                 Address = new[] { address }
             };
 
@@ -190,7 +187,7 @@ namespace AnalyzerCore.Infrastructure.Blockchain
                         Value = transaction.Value.Value,
                         Input = transaction.Input,
                         GasUsed = transaction.Gas.Value,
-                        Status = true, // Need to get receipt for actual status
+                        Status = true,
                         Timestamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value).UtcDateTime
                     });
                 }
