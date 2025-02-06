@@ -31,12 +31,6 @@ namespace AnalyzerCore.Application.Tokens.Commands.CreateToken
 
         public async Task<Token> Handle(CreateTokenCommand request, CancellationToken cancellationToken)
         {
-            _logger.LogInformation(
-                "Creating token {Symbol} ({Address}) on chain {ChainId}",
-                request.Symbol,
-                request.Address,
-                request.ChainId);
-
             var token = Token.Create(
                 request.Address,
                 request.Symbol,
@@ -44,25 +38,13 @@ namespace AnalyzerCore.Application.Tokens.Commands.CreateToken
                 request.Decimals,
                 request.ChainId);
 
-            var exists = await _tokenRepository.ExistsAsync(request.Address, request.ChainId, cancellationToken);
-            if (!exists)
+            if (!await _tokenRepository.ExistsAsync(request.Address, request.ChainId, cancellationToken))
             {
                 await _tokenRepository.AddAsync(token, cancellationToken);
                 await _tokenRepository.SaveChangesAsync(cancellationToken);
-                
-                _logger.LogInformation(
-                    "Created token {Symbol} ({Address}) on chain {ChainId}",
-                    token.Symbol,
-                    token.Address,
-                    token.ChainId);
             }
             else
             {
-                _logger.LogInformation(
-                    "Token {Address} already exists on chain {ChainId}",
-                    request.Address,
-                    request.ChainId);
-                
                 token = await _tokenRepository.GetByAddressAsync(request.Address, request.ChainId, cancellationToken);
             }
 

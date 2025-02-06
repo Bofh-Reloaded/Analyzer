@@ -2,10 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Application.Pools.Commands.CreatePool;
-using AnalyzerCore.Application.Pools.Commands.UpdatePoolReserves;
 using AnalyzerCore.Domain.Models;
 using AnalyzerCore.Domain.Services;
-using AnalyzerCore.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -26,7 +24,7 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             IMediator mediator,
             ChainConfig chainConfig,
             ILogger<BlockchainMonitorService> logger,
-            int pollingInterval = 60000, // 1 minute default
+            int pollingInterval = 60000,
             int blocksToProcess = 500)
         {
             _blockchainService = blockchainService;
@@ -39,10 +37,6 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
-                "Starting blockchain monitor for chain {ChainName}",
-                _chainConfig.Name);
-
             var lastProcessedBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
@@ -52,24 +46,12 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                     var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
                     if (currentBlock <= lastProcessedBlock)
                     {
-                        _logger.LogWarning(
-                            "No new blocks to process on chain {ChainName}. Current: {Current}, Last: {Last}",
-                            _chainConfig.Name,
-                            currentBlock,
-                            lastProcessedBlock);
-                        
                         await Task.Delay(_pollingInterval, stoppingToken);
                         continue;
                     }
 
                     var fromBlock = lastProcessedBlock + 1;
                     var toBlock = Math.Min(lastProcessedBlock + _blocksToProcess, currentBlock);
-
-                    _logger.LogInformation(
-                        "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
-                        fromBlock,
-                        toBlock,
-                        _chainConfig.Name);
 
                     var blocks = await _blockchainService.GetBlocksAsync(fromBlock, toBlock, stoppingToken);
                     foreach (var block in blocks)
@@ -88,12 +70,8 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Error processing blocks on chain {ChainName}",
-                        _chainConfig.Name);
-                    
-                    await Task.Delay(_pollingInterval * 2, stoppingToken); // Back off on error
+                    _logger.LogError(ex, "Error processing blocks");
+                    await Task.Delay(_pollingInterval * 2, stoppingToken);
                 }
             }
         }
@@ -102,13 +80,10 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
         {
             try
             {
-                // Check if this is a pool contract
-                var isPool = await IsPoolContractAsync(tx.To, cancellationToken);
-                if (isPool)
+                if (await IsPoolContractAsync(tx.To, cancellationToken))
                 {
                     var poolInfo = await _blockchainService.GetPoolInfoAsync(tx.To, cancellationToken);
                     
-                    // Create or update pool
                     await _mediator.Send(new CreatePoolCommand
                     {
                         Address = tx.To,
@@ -118,23 +93,11 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                         Type = poolInfo.Type,
                         ChainId = _chainConfig.ChainId
                     }, cancellationToken);
-
-                    // Update reserves
-                    await _mediator.Send(new UpdatePoolReservesCommand
-                    {
-                        Address = tx.To,
-                        ChainId = _chainConfig.ChainId,
-                        Reserve0 = poolInfo.Reserve0,
-                        Reserve1 = poolInfo.Reserve1
-                    }, cancellationToken);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "Error processing contract interaction for transaction {Hash}",
-                    tx.Hash);
+                _logger.LogError(ex, "Error processing contract interaction");
             }
         }
 
@@ -142,7 +105,6 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
         {
             try
             {
-                // Try to get pool info - if it succeeds, it's a pool
                 await _blockchainService.GetPoolInfoAsync(address, cancellationToken);
                 return true;
             }
