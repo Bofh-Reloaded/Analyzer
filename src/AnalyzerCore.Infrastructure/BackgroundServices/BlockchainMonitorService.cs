@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using AnalyzerCore.Application.Pools.Commands.CreatePool;
@@ -22,8 +23,10 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
         private readonly ChainConfig _chainConfig;
         private readonly int _pollingInterval;
         private readonly int _blocksToProcess;
+        private readonly int _batchSize;
         private readonly int _retryDelay;
         private readonly int _maxRetries;
+        private readonly int _requestDelay;
         private readonly AsyncRetryPolicy _retryPolicy;
 
         public BlockchainMonitorService(
@@ -41,8 +44,10 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             var monitoring = configuration.GetSection("Monitoring");
             _pollingInterval = monitoring.GetValue<int>("PollingInterval");
             _blocksToProcess = monitoring.GetValue<int>("BlocksToProcess");
+            _batchSize = monitoring.GetValue<int>("BatchSize");
             _retryDelay = monitoring.GetValue<int>("RetryDelay");
             _maxRetries = monitoring.GetValue<int>("MaxRetries");
+            _requestDelay = monitoring.GetValue<int>("RequestDelay");
 
             _retryPolicy = Policy
                 .Handle<Exception>()
@@ -70,34 +75,46 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             {
                 try
                 {
-                    await _retryPolicy.ExecuteAsync(async () =>
+                    var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
+                    var fromBlock = currentBlock - BigInteger.Parse(_blocksToProcess.ToString());
+                    var toBlock = currentBlock;
+
+                    _logger.LogInformation(
+                        "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
+                        fromBlock,
+                        toBlock,
+                        _chainConfig.Name);
+
+                    // Process blocks in batches
+                    for (var batchStart = fromBlock; batchStart <= toBlock && !stoppingToken.IsCancellationRequested; batchStart += _batchSize)
                     {
-                        var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
-                        var fromBlock = currentBlock - _blocksToProcess;
-                        var toBlock = currentBlock;
+                        var batchEnd = BigInteger.Min(batchStart + _batchSize - 1, toBlock);
 
-                        _logger.LogInformation(
-                            "Processing blocks {FromBlock} to {ToBlock} on chain {ChainName}",
-                            fromBlock,
-                            toBlock,
-                            _chainConfig.Name);
-
-                        var blocks = await _blockchainService.GetBlocksAsync(fromBlock, toBlock, stoppingToken);
-                        foreach (var block in blocks)
+                        await _retryPolicy.ExecuteAsync(async () =>
                         {
-                            if (stoppingToken.IsCancellationRequested) break;
-
-                            foreach (var tx in block.Transactions)
+                            var blocks = await _blockchainService.GetBlocksAsync(batchStart, batchEnd, stoppingToken);
+                            foreach (var block in blocks)
                             {
                                 if (stoppingToken.IsCancellationRequested) break;
 
-                                if (!string.IsNullOrEmpty(tx.To) && await _blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                foreach (var tx in block.Transactions)
                                 {
-                                    await ProcessContractInteractionAsync(tx, stoppingToken);
+                                    if (stoppingToken.IsCancellationRequested) break;
+
+                                    if (!string.IsNullOrEmpty(tx.To) && await _blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                    {
+                                        await ProcessContractInteractionAsync(tx, stoppingToken);
+                                    }
                                 }
                             }
+                        });
+
+                        // Add delay between batches to respect rate limits
+                        if (batchEnd < toBlock)
+                        {
+                            await Task.Delay(_requestDelay, stoppingToken);
                         }
-                    });
+                    }
 
                     await Task.Delay(_pollingInterval, stoppingToken);
                 }
