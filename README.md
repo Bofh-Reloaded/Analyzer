@@ -1,63 +1,176 @@
-# Analyzer Project Overview
+# 🔍 Blockchain Analyzer
 
-The Analyzer project is a sophisticated blockchain analysis tool designed for monitoring and analyzing blockchain transactions. Developed with the .NET platform, this tool offers real-time data collection, processing, and notification capabilities to cater to various blockchain networks.
+A powerful blockchain analysis tool built with Clean Architecture principles in .NET Core, designed for real-time monitoring and analysis of blockchain activities.
 
-## Key Features
+## 🌟 Key Features
 
-- **Real-time Transaction Monitoring**: Tracks and analyzes transactions within designated block ranges to identify patterns, anomalies, or specific conditions.
-- **Token Observation**: Automatically detects new token deployments and significant transactions involving tokens, offering insights into token dynamics and behaviors.
-- **Notification System**: Utilizes Telegram to deliver real-time alerts and updates on identified events or transactions, directly to stakeholders or systems.
-- **Configurability**: Supports various blockchain configurations, allowing users to tailor the tool's monitoring capabilities to specific needs without modifying the source code.
+- 🔄 **Real-time Blockchain Monitoring**
+  - Continuous block scanning and analysis
+  - Smart contract interaction detection
+  - Automatic pool discovery
+  - Transaction pattern recognition
 
-## Project Components
+- 🪙 **Token Tracking**
+  - New token detection
+  - Pool creation monitoring
+  - Reserve updates tracking
+  - Token pair analysis
 
-### Entry Point
-- `Program.cs`: Initializes the application, setting up dependencies and services based on the provided configuration.
+- 🏗️ **Clean Architecture**
+  - Domain-Driven Design
+  - SOLID principles
+  - CQRS pattern
+  - Repository pattern
 
-### Services
-This component contains several services that are integral to the system's operation:
+## 🏛️ Architecture Overview
 
-- `AnalyzerObserverService.cs`: A service dedicated to observing and analyzing blockchain data for configured block ranges and transaction types.
-- `DataCollectorService.cs`: Responsible for gathering blockchain data. It filters and processes transactions according to predefined criteria.
-- `TokenObserverService.cs`: Focuses on tracking and analyzing new tokens and significant token-related events.
+### 📦 Domain Layer
+The core business logic and rules:
+- `Token` and `Pool` entities
+- Repository interfaces
+- Blockchain service interfaces
+- Domain models and value objects
 
-### Database Layer (`DbLayer`)
-Handles all database interactions:
+### 🎯 Application Layer
+Use cases and business operations:
+- Command handlers for token creation
+- Pool management operations
+- CQRS implementation with MediatR
 
-- `DbContext.cs`: Configures and maintains the connection to the SQLite database, mapping the application's data models.
-- Models:
-  - `TokenEntity.cs`: Represents a token with properties such as address, symbol, transaction count, etc.
-  - `TransactionHash.cs`: Links transactions to tokens, storing hashes and related data.
-  - `Exchange.cs` & `Pool.cs`: Store information related to exchanges and liquidity pools associated with tokens.
+### 🔧 Infrastructure Layer
+External concerns implementation:
+- Blockchain service implementation
+- Database repositories
+- Background monitoring service
+- Entity Framework Core configuration
 
-### Models
-Defines various configuration and data models used across the application.
+### 🎮 API Layer
+Application entry point:
+- Dependency injection setup
+- Configuration management
+- Background service hosting
 
-### Notifier
-- `TelegramNotifier.cs`: Implements the logic for sending notifications via Telegram.
-- `ITelegramNotifier.cs`: Defines the interface for Telegram notifications.
+## 🚀 Getting Started
 
-## How It Works
+### Prerequisites
+- 📋 .NET 6.0 SDK
+- 🗄️ SQLite
+- 🌐 Blockchain RPC endpoint
 
-1. **Data Collection**: The `DataCollectorService` continuously polls the blockchain for new data, focusing on the blocks and transactions specified in the configuration.
-2. **Data Analysis**: Transactions are analyzed in real-time to detect new tokens, track token transfers, and monitor exchanges and pools.
-3. **Notification**: The `TelegramNotifier` sends out alerts based on the analysis, informing subscribers of important events like new tokens or significant transactions.
+### Configuration
+1. Update `appsettings.json`:
+```json
+{
+  "ChainConfig": {
+    "ChainId": "1",
+    "Name": "Ethereum",
+    "RpcUrl": "your-rpc-url",
+    "RpcPort": 8545
+  }
+}
+```
 
-## Use Cases
+### Installation
+```bash
+# Clone repository
+git clone https://github.com/yourusername/blockchain-analyzer.git
 
-- **Blockchain Developers**: Monitor and debug new deployments or track transactions on their contracts.
-- **Financial Analysts**: Gain insights into token dynamics and transaction flows on the blockchain.
-- **Crypto Enthusiasts**: Keep updated with real-time information about token launches and major blockchain events.
+# Navigate to project
+cd blockchain-analyzer
 
-## Configuration
+# Restore packages
+dotnet restore
 
-The tool can be configured to monitor different blockchains by adjusting the `appSettings.json` files for each supported blockchain (e.g., BSC, HECO, POLYGON).
+# Run migrations
+dotnet ef database update
 
-## Getting Started
+# Start application
+dotnet run
+```
 
-Clone the repository and set up the required environment variables and configuration files according to your blockchain of interest. Run the application as a .NET Core service.
+## 💡 How It Works
 
-## Contributing
+1. 🔍 **Block Monitoring**
+   - Continuously polls blockchain for new blocks
+   - Processes blocks in configurable batch sizes
+   - Identifies contract interactions
 
-Contributions are welcome! Feel free to fork the repository, make changes, and submit a pull request.
+2. 🏊 **Pool Detection**
+   - Analyzes contract interactions
+   - Identifies pool creation events
+   - Tracks pool reserves and updates
 
+3. 🪙 **Token Tracking**
+   - Automatically detects new tokens
+   - Retrieves token information
+   - Maintains token relationships
+
+## 🛠️ Technical Details
+
+### Database Schema
+- `Tokens`: Stores token information
+- `Pools`: Tracks liquidity pools
+- Relationships maintained via Entity Framework Core
+
+### Background Services
+- `BlockchainMonitorService`: Main monitoring service
+- Configurable polling intervals
+- Automatic retry on failures
+
+### Smart Contract Interaction
+- ERC20 token support
+- Uniswap V2 compatible pools
+- Extensible for other protocols
+
+## 🔐 Security
+
+- ✅ Input validation
+- 🔒 Safe contract interaction
+- 🛡️ Error handling
+- 🔄 Retry policies
+
+## ⚙️ Configuration Options
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| PollingInterval | Block check frequency (ms) | 60000 |
+| BlocksToProcess | Blocks per batch | 500 |
+| ChainId | Network identifier | 1 |
+| RpcUrl | Blockchain node URL | localhost |
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📝 Best Practices
+
+- ✨ Clean Code principles
+- 📏 SOLID design
+- 🧪 Separation of concerns
+- 🎯 Single responsibility
+- 🔄 Dependency inversion
+
+## 📚 Documentation
+
+For more detailed information about specific components:
+
+- 🏗️ [Architecture Guide](docs/architecture.md)
+- 🔧 [Setup Guide](docs/setup.md)
+- 📖 [API Documentation](docs/api.md)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- .NET Community
+- Blockchain developers
+- Open source contributors
+
+---
+Built with ❤️ for the blockchain community
