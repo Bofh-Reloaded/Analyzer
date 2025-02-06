@@ -8,6 +8,7 @@ using AnalyzerCore.Domain.Services;
 using AnalyzerCore.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Polly;
@@ -17,8 +18,7 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
 {
     public class BlockchainMonitorService : BackgroundService
     {
-        private readonly IBlockchainService _blockchainService;
-        private readonly IMediator _mediator;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<BlockchainMonitorService> _logger;
         private readonly ChainConfig _chainConfig;
         private readonly int _pollingInterval;
@@ -30,14 +30,12 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
         private readonly AsyncRetryPolicy _retryPolicy;
 
         public BlockchainMonitorService(
-            IBlockchainService blockchainService,
-            IMediator mediator,
+            IServiceProvider serviceProvider,
             ChainConfig chainConfig,
             ILogger<BlockchainMonitorService> logger,
             IConfiguration configuration)
         {
-            _blockchainService = blockchainService;
-            _mediator = mediator;
+            _serviceProvider = serviceProvider;
             _chainConfig = chainConfig;
             _logger = logger;
             
@@ -75,7 +73,11 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             {
                 try
                 {
-                    var currentBlock = await _blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
+                    using var scope = _serviceProvider.CreateScope();
+                    var blockchainService = scope.ServiceProvider.GetRequiredService<IBlockchainService>();
+                    var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                    var currentBlock = await blockchainService.GetCurrentBlockNumberAsync(stoppingToken);
                     var fromBlock = currentBlock - BigInteger.Parse(_blocksToProcess.ToString());
                     var toBlock = currentBlock;
 
@@ -92,7 +94,7 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
 
                         await _retryPolicy.ExecuteAsync(async () =>
                         {
-                            var blocks = await _blockchainService.GetBlocksAsync(batchStart, batchEnd, stoppingToken);
+                            var blocks = await blockchainService.GetBlocksAsync(batchStart, batchEnd, stoppingToken);
                             foreach (var block in blocks)
                             {
                                 if (stoppingToken.IsCancellationRequested) break;
@@ -101,9 +103,9 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
                                 {
                                     if (stoppingToken.IsCancellationRequested) break;
 
-                                    if (!string.IsNullOrEmpty(tx.To) && await _blockchainService.IsContractAsync(tx.To, stoppingToken))
+                                    if (!string.IsNullOrEmpty(tx.To) && await blockchainService.IsContractAsync(tx.To, stoppingToken))
                                     {
-                                        await ProcessContractInteractionAsync(tx, stoppingToken);
+                                        await ProcessContractInteractionAsync(blockchainService, mediator, tx, stoppingToken);
                                     }
                                 }
                             }
@@ -130,15 +132,19 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             }
         }
 
-        private async Task ProcessContractInteractionAsync(TransactionInfo tx, CancellationToken cancellationToken)
+        private async Task ProcessContractInteractionAsync(
+            IBlockchainService blockchainService,
+            IMediator mediator,
+            TransactionInfo tx,
+            CancellationToken cancellationToken)
         {
             try
             {
-                if (await IsPoolContractAsync(tx.To, cancellationToken))
+                if (await IsPoolContractAsync(blockchainService, tx.To, cancellationToken))
                 {
-                    var poolInfo = await _blockchainService.GetPoolInfoAsync(tx.To, cancellationToken);
+                    var poolInfo = await blockchainService.GetPoolInfoAsync(tx.To, cancellationToken);
                     
-                    await _mediator.Send(new CreatePoolCommand
+                    await mediator.Send(new CreatePoolCommand
                     {
                         Address = tx.To,
                         Token0Address = poolInfo.Token0,
@@ -164,11 +170,14 @@ namespace AnalyzerCore.Infrastructure.BackgroundServices
             }
         }
 
-        private async Task<bool> IsPoolContractAsync(string address, CancellationToken cancellationToken)
+        private async Task<bool> IsPoolContractAsync(
+            IBlockchainService blockchainService,
+            string address,
+            CancellationToken cancellationToken)
         {
             try
             {
-                await _blockchainService.GetPoolInfoAsync(address, cancellationToken);
+                await blockchainService.GetPoolInfoAsync(address, cancellationToken);
                 return true;
             }
             catch
